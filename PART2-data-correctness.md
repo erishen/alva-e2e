@@ -140,6 +140,13 @@ npm run report        # 或 make report
   - `chat.spec.ts` 欢迎语 = **1 flaky**：站点慢加载偶发，重试通过；已把局部超时提到 45s，CI `retries:2` 仍兜底。
 校准后预期（含 waitForFunction 修复）：深链内容守卫不再因时序抖动失败，复跑约 **108 passed / 1 failed**（唯一红为设计内 D-1）。注：chat / comps(AMD 在表) / markets(anomalies) 偶发 flaky 属 alva.ai 慢加载的环境性偶发，非断言错误，CI 的 `retries:2` 会兜底；本地偶发 flaky 不影响交付。
 
+### 5.2.2 最新本机全量实跑（2026-09-03 晚，commit f0f8179 之后）
+- 结果：**107 passed / 1 failed / 1 flaky**（约 3.1 min）
+- 分解：
+  - `comps.spec.ts` EV/MC `$0.0` 守卫 = **1 failed（设计内 D-1）**：预期红色，未变。
+  - `valuation.spec.ts:38`「估值倍数都是正数，且带 TTM 口径说明」= **1 flaky（已定位修复）**：根因是 `waitForDataReady` 的就绪判据只等了 KPI `value`/可比表/财务表行数，**没等 KPI `sub` 口径文案**——估值的 `sub`（"TTM P/E" 等）是页面最晚填充字段之一，早期快照里 `value` 已是价格但 `sub` 还是空占位，于是 `extractDashboard` 偶在 `sub` 注入 "TTM" 前冻住快照，导致这条只依赖 `.sub` 的断言偶发红。修法：把「估值 KPI（`P/E`/`P/S`/`EV / EBITDA`）的 `value` 已是数字且 `sub` 含 `TTM`」也纳入 `tests/helpers/common.ts::waitForDataReady` 的就绪判据（commit 待落），从源头消除时序竞争，**断言语义不变**，且对所有 spec 共享的 `loadDashboard` 一并生效、降低整体抖动。
+- 校准后预期（含本次 common.ts 修复）：复跑约 **108 passed / 1 failed（D-1 设计内）、0 flaky**。
+
 ### 5.3 CI 建议
 - `@data` 层每日定时跑（数据正确性对时效敏感）；`@ui` 层随页面变更跑；`@smoke` 层每次部署后跑。
 - `forbidOnly: !!process.env.CI` 已开，防止 `.only` 误提交导致 CI 只跑一条。

@@ -61,7 +61,26 @@ export async function waitForDataReady(
       const hasPrice = vals.some((v) => /^\$\d/.test(v));
       const comps = document.querySelectorAll('.comps-grid .cg-tk').length;
       const finRows = document.querySelectorAll('.table-row.table-body-row').length;
-      return hasPrice && comps >= 5 && finRows >= 15;
+
+      // 估值倍数的 `sub` 口径（"TTM P/E" 等）是页面最晚填充的字段之一：
+      // 早期快照里 kpi-value 已是价格、但 kpi-sub 还是空占位。若不等它，
+      // valuation.spec 的「带 TTM 口径说明」断言会偶发误红（value 就绪、sub 未就绪）。
+      // 因此把「估值 KPI 的 value 已是数字且 sub 含 TTM」也作为就绪信号。
+      const valuationReady = ['P/E', 'P/S', 'EV / EBITDA'].every((label) => {
+        const cell = [...document.querySelectorAll('.kpi-cell')].find(
+          (c) =>
+            (c.querySelector('.kpi-label')?.textContent || '')
+              .trim()
+              .toLowerCase() === label.toLowerCase()
+        );
+        if (!cell) return false;
+        const v = (cell.querySelector('.kpi-value')?.textContent || '').trim();
+        const sub = (cell.querySelector('.kpi-sub')?.textContent || '')
+          .toUpperCase();
+        return /^[$\d]/.test(v) && sub.includes('TTM');
+      });
+
+      return hasPrice && comps >= 5 && finRows >= 15 && valuationReady;
     },
     undefined,
     { timeout }
