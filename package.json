@@ -1,0 +1,22 @@
+{
+  "name": "alva-playbook-e2e",
+  "version": "1.0.0",
+  "description": "E2E tests for alva.ai playbook pages using Playwright",
+  "scripts": {
+    "test": "playwright test",
+    "test:data": "playwright test --grep @data",
+    "test:ui-only": "playwright test --grep @ui",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:smoke": "playwright test --grep @smoke",
+    "report": "playwright show-report",
+    "codegen": "playwright codegen",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.3"
+  }
+}
