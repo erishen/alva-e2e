@@ -39,7 +39,7 @@ async function settle(page: import('@playwright/test').Page) {
   for (let i = 0; i < 12; i++) {
     await page.waitForTimeout(1000);
     const len = await page.evaluate(() => (document.body.innerText || '').length);
-    if (len === prev && len > 400) break;
+    if (len === prev && len > 50) break; // 稳定即可（图表为主的默认 tab 正文本就 <400）
     prev = len;
   }
 }
@@ -64,9 +64,12 @@ test.describe('markets 个股页 @markets', () => {
         const sel = await tabEl.getAttribute('aria-selected');
         if (sel !== null) await expect(tabEl).toHaveAttribute('aria-selected', 'true');
       }
-      // 内容非空（真实 bug 守卫：若深链未渲染对应面板，正文会塌缩到阈值以下）
+      // 内容非空（真实 bug 守卫：若深链未渲染对应面板，正文会塌缩到阈值以下）。
+      // 阈值按 tab 区分：Overview 是默认 tab、以图表为主、文字极少（实测 ~249 字），
+      // 阈值放低；其余文本型 tab 维持 >400（实测均 >400）。
+      const floor = isDefault ? 150 : 400;
       const len = await page.evaluate(() => (document.body.innerText || '').length);
-      expect(len).toBeGreaterThan(400);
+      expect(len, `深链 ${param} 内容疑似未渲染（正文长度 ${len} < 阈值 ${floor}）`).toBeGreaterThan(floor);
     });
   }
 
