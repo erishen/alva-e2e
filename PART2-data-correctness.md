@@ -38,7 +38,9 @@
 - **实际**：整列 `$0.0`，等价于「可比分析里最核心的两个估值锚点缺失」。
 - **复现**：打开 playbook → 滚动到 Comparables 表 → 观察 `EV` / `Market cap` 列。
 - **证据（守卫用例）**：`tests/comps.spec.ts` → `EV 与 Market cap 应有真实数值（当前全部为 $0.0，已知缺陷）`。该用例**故意保持活跃失败**：`expect(bad).toEqual([])` 在 `$0.0` 出现时不通过，缺陷修复后自动转绿。
-- **可视化证据（自动留存）**：本缺陷属「渲染成 $0.0」的可见问题，守卫除断言外额外抓一张截图 `evidence/comps-ev-mc-zero.png` 并 `attach` 到 HTML 报告（`npm run report` 直接看）。截图实现要点（曾踩坑截出白屏）：① 必须用 `beforeAll` 里真正加载好的 `page`，不能用 test fixture 自动分配的空白 `page`；② 正文在**跨域 iframe** 内、且可比表仅在 **Comps Tab** 激活时可见，故先点 Comps Tab 再直接截 iframe 内的 `.comps-grid` 元素（锁定 EV/Market cap 两列的 `$0.0`），规避跨域整页截图留白与 `display:none` 截不到内容两坑。截图在本机 `npm test` 时生成（沙箱连不上 alva.ai，无法代跑）——生成后 `git add evidence/` 即可随仓库交付，评审人无需重跑即见真实页面状态。
+- **可视化证据（自动留存，交付级、一眼自解释）**：守卫除断言外额外生成两张截图并 `attach` 到 HTML 报告（`npm run report` 直接看），均由本机 `npm test` 产出（沙箱连不上 alva.ai，无法代跑）——生成后 `git add evidence/` 即随仓库交付，评审人无需重跑即见真实页面状态。实现要点（曾踩坑截出白屏，已规避）：用 `beforeAll` 真正加载好的 `page` 经 `dashboardFrame()` 取跨域 iframe，先点 **Comps Tab** 让可比表可见，再在 iframe 内截；不用 test fixture 空白 `page`、不用 `page.screenshot()`（跨域 OOPIF 留白）。
+  - `evidence/comps-ev-mc-zero.png`（**主证据**）：`.comps-grid` 元素截图，已注入 **红框 + 浅红底高亮** EV / Market cap 两列（第 1、2 个 `.cg-num`），`$0.0` 缺陷列一眼可见。
+  - `evidence/comps-full.png`（**上下文证据**）：Comps 区块整段（抬高视口截 iframe `body`；因 Comps Tab 激活时其他区块 `display:none`，视口即整段可比表），含区块标题、红框高亮，及顶部 **红色文字标注横幅**「⚠ 缺陷证据：EV / Market cap 两列全部 = $0.0（AMD 为千亿级公司，客观为错误数据）」，证明是真实 AMD 页面且无需看报告即懂。
 - **录屏说明（不可靠，不依赖）**：`playwright.config.ts` 的 `video: 'retain-on-failure'` 会为失败用例留视频，但本组用例用 `describe.configure({ mode: 'serial' })` + `beforeAll` 共享一个页面，**视频录制的是 per-test 的 fixture 空白页而非共享仪表盘页**，对 D-1 这类用例同样会白屏。因此 D-1 的可靠视觉证据以**截图**为准，录屏不作为交付证据。
 - **严重度**：**高（P1，数据正确性）**。可比表是投资决策核心视图，$0.0 会直接误导相对估值判断；虽不崩溃页面，但在金融数据产品里属高优先级数据缺陷。
 - **备注**：本缺陷与 `tests/market-data.spec.ts` 的「市值量级合理（十亿级以上）」**不冲突**——后者校验的是 `/markets/AMD` 行情 KPI 的 Market cap（有真实值、通过），而 `$0.0` 只出现在**可比表**的 EV/MC 列（行情 KPI 的市值有真实值），说明该问题局限于 Comps 视图的这两列，而非全局市值数据缺失。究竟是「取数路径故障」还是「功能未实现」需后端确认，但两者都构成应被守卫拦截的错误展示——这也是本套件将其登记为活跃失败而非 `test.skip` 的原因。

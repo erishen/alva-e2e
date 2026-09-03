@@ -186,15 +186,22 @@ test.describe('可比公司 @data', () => {
   // 守卫强度：不仅拒绝 0 / 空，还要求量级达到十亿级（可比公司均为超大盘，
   // 任一 EV/市值 < $1B 即视为数据错误或算错，避免缺陷被「修成别的非零错值」悄悄放过）。
   //
-  // 证据留存：本缺陷是「渲染成 $0.0」的可见问题，除断言外额外抓一张截图
-  // 到 evidence/ 并 attach 到 HTML 报告，使评审人无需重跑即可看到真实页面状态。
-  // 截图注意两点（早期版本截出白屏的根因）：
-  //   1. 必须用 beforeAll 里真正加载好的 page（模块级变量），而非 test fixture
-  //      自动分配的空白 page —— 后者从没 goto 过任何地址，截出来是纯白屏；
-  //   2. 正文全在跨域 iframe 内，且可比表仅在「Comps」Tab 激活时可见（display:none
-  //      时截不出内容）。因此先切到 Comps Tab，再直接截 iframe 内的 .comps-grid
-  //      元素（锁定 EV / Market cap 两列的 $0.0），跨域 OOPIF 整页截图留白问题也规避。
-  // （视频由 playwright.config.ts 的 video:'retain-on-failure' 自动留存在 test-results/）
+  // 证据留存：本缺陷是「渲染成 $0.0」的可见问题，除断言外额外抓截图到 evidence/
+  // 并 attach 到 HTML 报告，使评审人无需重跑即见真实页面状态。截图为「交付级证据」，
+  // 需一眼自解释，故做了四重增强：
+  //   1. 切到 Comps Tab，让可比表可见（正文在跨域 iframe 内，且可比表仅在此 Tab 激活
+  //      时可见，display:none 时截不出内容）；
+  //   2. 注入红色高亮：EV（第 1 个 .cg-num）/ Market cap（第 2 个 .cg-num）两列加红框
+  //      + 浅红底，让 $0.0 缺陷列一眼可见；
+  //   3. 注入红色标注横幅（fixed 顶栏）："⚠ 缺陷证据：EV / Market cap 两列全部 = $0.0…"；
+  //   4. 截两张：comps-ev-mc-zero.png = .comps-grid 元素（精准锁定缺陷列）；
+  //      comps-full.png = iframe 整页（含区块标题/上下文，证明是真实页面，并带文字标注）。
+  // 注意（早期版本截出白屏的根因，已规避）：必须用 beforeAll 里真正加载好的 page
+  // （模块级变量）经 dashboardFrame() 取 iframe 截；不能用 test fixture 自动分配的
+  // 空白 page（从没 goto 过任何地址 → 纯白屏），也不能用 page.screenshot()（跨域
+  // OOPIF 整页留白）。
+  // （视频由 playwright.config.ts 的 video:'retain-on-failure' 自动留存在 test-results/，
+  //  但本组 serial+beforeAll 共享页面用例录的是空白 fixture page，不可靠，不依赖）
   test('EV 与 Market cap 应有真实数值（当前全部为 $0.0，已知缺陷）', async ({}, testInfo) => {
     const FLOOR = 1e9; // 十亿级：可比公司（AMD/INTC/NVDA/QCOM/TSM/ARM/AVGO/MRVL）均为超大盘
     const bad = data.comps
@@ -205,7 +212,7 @@ test.describe('可比公司 @data', () => {
       })
       .map((c) => `${c.ticker}: EV=${c.ev} MC=${c.marketCap}`);
 
-    // 抓证据：切到 Comps Tab → 等比表可见 → 截该表元素（含 $0.0 的 EV/MC 列）
+    // 抓证据（增强版）：切到 Comps Tab → 等比表可见 → 注入高亮 + 文字标注 → 截双图
     const frame = await dashboardFrame(page);
     const compsTab = frame
       .locator('.tab-underline .tab-item', { hasText: 'Comps' })
@@ -213,14 +220,53 @@ test.describe('可比公司 @data', () => {
     await compsTab.click();
     const grid = frame.locator('.comps-grid');
     await expect(grid, '切到 Comps Tab 后可比表应可见').toBeVisible({ timeout: 30_000 });
-    const shotPath = path.join('evidence', 'comps-ev-mc-zero.png');
+
+    // 高亮 EV / Market cap 两列（红框 + 浅红底）：第 1、2 个 .cg-num 即 EV / MC
+    await frame.addStyleTag({
+      content: `
+        .comps-grid .cg-tk + .cg-num,
+        .comps-grid .cg-tk + .cg-num + .cg-num {
+          outline: 3px solid #e02424 !important;
+          outline-offset: -3px !important;
+          background: rgba(224, 36, 36, 0.10) !important;
+        }
+      `,
+    });
+    // 文字标注横幅（fixed 顶栏，红底白字，截图中即见缺陷说明）
+    await frame.evaluate(() => {
+      if (document.getElementById('d1-defect-banner')) return;
+      const banner = document.createElement('div');
+      banner.id = 'd1-defect-banner';
+      banner.textContent =
+        '⚠ 缺陷证据：EV / Market cap 两列全部 = $0.0（AMD 为千亿级公司，客观为错误数据）';
+      banner.style.cssText =
+        'position:fixed;top:0;left:0;right:0;z-index:2147483647;' +
+        'background:#e02424;color:#fff;' +
+        'font:600 14px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;' +
+        'padding:8px 14px;box-shadow:0 2px 8px rgba(0,0,0,.3);';
+      document.body.appendChild(banner);
+    });
+
     mkdirSync('evidence', { recursive: true });
+    // 主证据：精准锁定缺陷列的网格截图（带红框高亮）
+    const shotPath = path.join('evidence', 'comps-ev-mc-zero.png');
     await grid.screenshot({ path: shotPath });
     await testInfo.attach('comps-ev-mc-zero', {
       path: shotPath,
       contentType: 'image/png',
     });
+    // 上下文证据：Comps Tab 激活时其他区块是 display:none，视口里正好是整段可比表。
+    // 抬高浏览器视口高度以容纳整段，再截 iframe 的 body（Locator.screenshot 在本版本
+    // 不支持 fullPage、Frame 也无 screenshot 方法，故用「抬视口 + 视口截图」技巧拿到
+    // 完整可比区块上下文，含区块标题/红框高亮/文字标注横幅，证明是真实 AMD 页面）。
+    await page.setViewportSize({ width: 1440, height: 4000 });
+    const fullPath = path.join('evidence', 'comps-full.png');
+    await frame.locator('body').screenshot({ path: fullPath });
+    await testInfo.attach('comps-full-context', {
+      path: fullPath,
+      contentType: 'image/png',
+    });
 
-    expect(bad, `以下公司 EV/市值 为 0 / 空 / 或量级异常（已知取数缺陷）：${bad.join(' ; ')}`).toEqual([]);
+    expect(bad, `以下公司 EV/市值 为 0 / 空 / 或量级异常（已知缺陷，疑似未接入数据源）：${bad.join(' ; ')}`).toEqual([]);
   });
 });
