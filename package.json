@@ -1,5 +1,5 @@
 {
-  "name": "alva-playbook-e2e",
+  "name": "alva-e2e",
   "version": "1.0.0",
   "description": "E2E tests for alva.ai playbook pages using Playwright",
   "scripts": {

@@ -1,98 +1,93 @@
 /**
- * Part 1 登录链路脚手架（注册 → Automation → Playbook → Alert + AI 一致性）。
+ * Part 1 登录链路探索式测试（@part1）
  *
- * ⚠️ 默认跳过：无凭据时不运行，避免污染 Part 2 数据套件的绿集。
- *    填好 part1/.env（ALVA_EMAIL / ALVA_PASSWORD）后才会执行。
+ * 产品事实（已用探针确认真实结构，非凭截图猜）：
+ *   - Alva 是**聊天驱动的 AI agent**，不是表单产品。Playbook / Alert / Automation
+ *     都靠跟 Alva 对话生成，没有 /playbooks、/alerts 这种直接表单页
+ *     （直接访问会落到 404 的 "Go Home" 页）。
+ *   - 持久左侧栏：New Chat / Explore / Portfolio / Markets / Channels / Alva / for-you
+ *   - 首页：AI agent 问候 + 快捷卡（Connect Portfolio / Chat / Tasks / Alerts / Memory / Files）
+ *   - Explore 页：已发布 Playbook 列表（如 "AMD Deep-Dive"）+ 分类标签
+ *   - 聊天输入框是 DIV[role="textbox"]（placeholder "Ask Alva anything..."），在
+ *     [data-testid="agent-chat-tab"] 面板里；全站仅 2 个稳定 data-testid：
+ *     sidebar-user、agent-chat-tab。
  *
- * ⚠️ 选择器是占位骨架：Alva 的 DOM 类名/流程可能已变。
- *    跑之前请先用 `node` 探测脚本确认真实结构（同 Part 2 的做法），再回填下方 locator。
+ * 登录方式：用 Gmail / Google SSO 登录后，由 export-state.mjs 导出会话文件复用，
+ * 本套件**不复现登录**。无该文件则整组跳过，避免污染 Part 2 数据套件的绿集。
+ *
+ * ⚠️ 限流风险：Alva 后端对高频/出口 IP 有限流，AI 回复（test 5）可能超时。
+ *   该条为已知脆弱点，失败不影响"登录链路可达性"结论，详细问题见 PART1-onboarding.md。
  */
 import { test, expect } from '@playwright/test';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const BASE = process.env.BASE_URL ?? 'https://alva.ai';
-const EMAIL = process.env.ALVA_EMAIL ?? '';
-const PASSWORD = process.env.ALVA_PASSWORD ?? '';
-const WATCH_TICKER = process.env.WATCH_TICKER ?? 'NVDA';
+const AUTH_FILE = resolve(__dirname, '.auth', 'alva.json');
+const ASK = process.env.WATCH_TICKER ?? 'AAPL';
 
 test.describe('登录链路探索式测试 @part1', () => {
-  // 无凭据 → 整组跳过（避免污染 Part 2 数据套件的绿集）
-  test.skip(!(EMAIL && PASSWORD), '需要提供 ALVA_EMAIL / ALVA_PASSWORD');
+  test.skip(!existsSync(AUTH_FILE), '需先运行 `node part1/export-state.mjs` 用 Gmail 手动登录并导出会话');
 
-  test('注册 → 进入应用', async ({ page }) => {
-    await page.goto(`${BASE}/signup`);
-    // TODO: 回填真实选择器
-    await page.getByLabel(/email/i).fill(EMAIL);
-    await page.getByLabel(/password/i).fill(PASSWORD);
-    await page.getByRole('button', { name: /create account|sign up/i }).click();
-    // 预期：注册后落在应用内（侧边栏 / 工作台可见）
-    await expect(page.getByText(/portfolio|watchlist|explore/i)).toBeVisible();
+  test.use({ storageState: AUTH_FILE });
+
+  // 等待 SPA 应用壳加载完毕：常驻左侧栏出现即视为已登录进入工作台。
+  // 注意：聊天面板（agent-chat-tab）是首页专属伴侣，在 /explore 等路由会被收起，
+  // 故不作为通用就绪条件，仅聊天测试在首页显式使用。
+  async function waitForWorkspace(page: import('@playwright/test').Page) {
+    await expect(page.getByText('Portfolio')).toBeVisible({ timeout: 30_000 });
+  }
+
+  test('1) 登录后进入工作台：左侧栏 + AI agent 问候可见', async ({ page }) => {
+    await page.goto(BASE);
+    await waitForWorkspace(page);
+    // AI agent 问候语（首页真实文本）
+    await expect(page.getByText(/your AI investing agent/i)).toBeVisible();
   });
 
-  test('建 Portfolio Watch Automation', async ({ page }) => {
-    await page.goto(`${BASE}/login`);
-    await page.getByLabel(/email/i).fill(EMAIL);
-    await page.getByLabel(/password/i).fill(PASSWORD);
-    await page.getByRole('button', { name: /log ?in/i }).click();
-
-    // TODO: 导航到 Automations → New → 添加标的 + 阈值
-    await page.getByRole('link', { name: /automation/i }).click();
-    await page.getByRole('button', { name: /new|create/i }).click();
-    await page.getByLabel(/ticker|symbol/i).fill(WATCH_TICKER);
-    await page.getByRole('button', { name: /save|create/i }).click();
-
-    // 预期：新建的 automation 出现在列表里
-    await expect(page.getByText(WATCH_TICKER)).toBeVisible();
+  test('2) Explore 可达且列出已发布 Playbook', async ({ page }) => {
+    await page.goto(`${BASE}/explore`);
+    await waitForWorkspace(page);
+    // 已发布的示例 Playbook（探针确认存在于 Explore 列表）
+    await expect(page.getByText('AMD Deep-Dive')).toBeVisible({ timeout: 30_000 });
+    // 分类标签也存在，证明 Explore 内容区正常渲染（多匹配取 first 避开 strict mode）
+    await expect(page.getByText(/Asset Deepdive|Popular|Smart Screener/i).first()).toBeVisible();
   });
 
-  test('建 Playbook', async ({ page }) => {
-    await page.goto(`${BASE}/login`);
-    await page.getByLabel(/email/i).fill(EMAIL);
-    await page.getByLabel(/password/i).fill(PASSWORD);
-    await page.getByRole('button', { name: /log ?in/i }).click();
-
-    // TODO: New Playbook → 选标的 → 生成
-    await page.getByRole('button', { name: /new playbook/i }).click();
-    await page.getByLabel(/ticker|symbol/i).fill(WATCH_TICKER);
-    await page.getByRole('button', { name: /generate|build/i }).click();
-
-    // 预期：Playbook 渲染出仪表盘（含行情 KPI）
-    const frame = page.frameLocator('iframe[title="Dashboard"]');
-    await expect(frame.getByText(WATCH_TICKER)).toBeVisible({ timeout: 60000 });
+  test('3) 首页快捷入口可达：Alerts / Tasks / Memory / Files', async ({ page }) => {
+    await page.goto(BASE);
+    await waitForWorkspace(page);
+    // 首页 AI agent 区的快捷卡（探针确认）
+    await expect(page.getByText('Alerts')).toBeVisible();
+    await expect(page.getByText('Tasks')).toBeVisible();
+    await expect(page.getByText('Memory')).toBeVisible();
+    await expect(page.getByText('Files')).toBeVisible();
   });
 
-  test('配置 Alert 并验证收到', async ({ page }) => {
-    await page.goto(`${BASE}/login`);
-    await page.getByLabel(/email/i).fill(EMAIL);
-    await page.getByLabel(/password/i).fill(PASSWORD);
-    await page.getByRole('button', { name: /log ?in/i }).click();
-
-    // TODO: 打开某个 Playbook → 配置 Alert（价格/事件触发）→ 保存
-    await page.getByRole('button', { name: /alert/i }).click();
-    await page.getByRole('button', { name: /save|enable/i }).click();
-
-    // 预期：Alert 出现在 Alert 中心 / 通知列表
-    await page.getByRole('link', { name: /alert/i }).click();
-    await expect(page.getByText(WATCH_TICKER)).toBeVisible();
+  test('4) 聊天入口可用：能输入并提交消息', async ({ page }) => {
+    await page.goto(BASE);
+    await waitForWorkspace(page);
+    await page.getByTestId('agent-chat-tab').click();
+    const box = page.getByRole('textbox');
+    await expect(box).toBeVisible();
+    await box.click();
+    await box.type(`What is the current price of ${ASK}?`);
+    await box.press('Enter');
+    // 用户消息进入对话区（不依赖助手回复，验证输入链路）
+    await expect(page.getByText(`What is the current price of ${ASK}?`)).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
-  test('AI 一致性：Agent 回答引用的价格应与页面行情一致', async ({ page }) => {
-    await page.goto(`${BASE}/login`);
-    await page.getByLabel(/email/i).fill(EMAIL);
-    await page.getByLabel(/password/i).fill(PASSWORD);
-    await page.getByRole('button', { name: /log ?in/i }).click();
-
-    // 打开 Playbook，先读页面上的 SPOT 价格
-    const frame = page.frameLocator('iframe[title="Dashboard"]');
-    const spotText = (await frame.getByText(/spot/i).first().innerText()).trim();
-
-    // 让 Alva Agent 回答关于该标的价格的问题
-    const input = page.getByPlaceholder(/ask|message/i);
-    await input.fill('What is the current spot price shown on this page?');
-    await input.press('Enter');
-
-    // 预期：Agent 回答里出现的价格应与页面 SPOT 同量级（容差 1%）
-    const answer = await page.getByTestId('agent-answer').innerText();
-    expect(answer, 'Agent 未给出任何价格数字').toMatch(/\$[\d,]+(\.\d+)?/);
-    // TODO: 解析 answer 中的价格，与 spotText 做 ±1% 交叉校验
+  test('5) AI 一致性：助手回复应给出带 $ 的价格', async ({ page }) => {
+    await page.goto(BASE);
+    await waitForWorkspace(page);
+    await page.getByTestId('agent-chat-tab').click();
+    const box = page.getByRole('textbox');
+    await box.click();
+    await box.type(`What is the current price of ${ASK}?`);
+    await box.press('Enter');
+    // 宽容等待：助手回复出现且含 $ 价格（受后端限流影响，超时即暴露脆弱点）
+    await expect(page.getByText(/\$[\d,]+(\.\d+)?/)).toBeVisible({ timeout: 60_000 });
   });
 });
