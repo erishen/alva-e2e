@@ -38,7 +38,8 @@
 - **实际**：整列 `$0.0`，等价于「可比分析里最核心的两个估值锚点缺失」。
 - **复现**：打开 playbook → 滚动到 Comparables 表 → 观察 `EV` / `Market cap` 列。
 - **证据（守卫用例）**：`tests/comps.spec.ts` → `EV 与 Market cap 应有真实数值（当前全部为 $0.0，已知缺陷）`。该用例**故意保持活跃失败**：`expect(bad).toEqual([])` 在 `$0.0` 出现时不通过，缺陷修复后自动转绿。
-- **可视化证据（自动留存）**：本缺陷属「渲染成 $0.0」的可见问题，守卫除断言外额外抓一张**整页截图** `evidence/comps-ev-mc-zero.png`（含 iframe 里的可比表，$0.0 清晰可见），并 `attach` 到 HTML 报告（`npm run report` 直接看）；**录屏**由 `playwright.config.ts` 的 `video: 'retain-on-failure'` 自动留存在 `test-results/`（D-1 设计红 → 每次都留）。截图/视频均在本机 `npm test` 时生成（沙箱连不上 alva.ai，无法代跑）——生成后 `git add evidence/` 即可随仓库交付，评审人无需重跑即见真实页面状态。
+- **可视化证据（自动留存）**：本缺陷属「渲染成 $0.0」的可见问题，守卫除断言外额外抓一张截图 `evidence/comps-ev-mc-zero.png` 并 `attach` 到 HTML 报告（`npm run report` 直接看）。截图实现要点（曾踩坑截出白屏）：① 必须用 `beforeAll` 里真正加载好的 `page`，不能用 test fixture 自动分配的空白 `page`；② 正文在**跨域 iframe** 内、且可比表仅在 **Comps Tab** 激活时可见，故先点 Comps Tab 再直接截 iframe 内的 `.comps-grid` 元素（锁定 EV/Market cap 两列的 `$0.0`），规避跨域整页截图留白与 `display:none` 截不到内容两坑。截图在本机 `npm test` 时生成（沙箱连不上 alva.ai，无法代跑）——生成后 `git add evidence/` 即可随仓库交付，评审人无需重跑即见真实页面状态。
+- **录屏说明（不可靠，不依赖）**：`playwright.config.ts` 的 `video: 'retain-on-failure'` 会为失败用例留视频，但本组用例用 `describe.configure({ mode: 'serial' })` + `beforeAll` 共享一个页面，**视频录制的是 per-test 的 fixture 空白页而非共享仪表盘页**，对 D-1 这类用例同样会白屏。因此 D-1 的可靠视觉证据以**截图**为准，录屏不作为交付证据。
 - **严重度**：**高（P1，数据正确性）**。可比表是投资决策核心视图，$0.0 会直接误导相对估值判断；虽不崩溃页面，但在金融数据产品里属高优先级数据缺陷。
 - **备注**：本缺陷与 `tests/market-data.spec.ts` 的「市值量级合理（十亿级以上）」**不冲突**——后者校验的是 `/markets/AMD` 行情 KPI 的 Market cap（有真实值、通过），而 `$0.0` 只出现在**可比表**的 EV/MC 列，说明是可比表这一取数路径的局部缺陷，而非全局市值缺失。
 

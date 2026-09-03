@@ -2,7 +2,7 @@ import { test, expect, Page, Browser, type TestInfo } from '@playwright/test';
 import { mkdirSync } from 'fs';
 import path from 'path';
 import { loadDashboard, DashboardData } from './helpers/common';
-import { kpi, FinTable, CompRow } from './helpers/extract';
+import { kpi, FinTable, CompRow, dashboardFrame } from './helpers/extract';
 import { parseMoney, parseMultiple, isEmptyValue } from './helpers/parse';
 
 /**
@@ -184,10 +184,16 @@ test.describe('可比公司 @data', () => {
   // 守卫强度：不仅拒绝 0 / 空，还要求量级达到十亿级（可比公司均为超大盘，
   // 任一 EV/市值 < $1B 即视为取数错误或算错，避免缺陷被「修成别的非零错值」悄悄放过）。
   //
-  // 证据留存：本缺陷是「渲染成 $0.0」的可见问题，除断言外额外抓一张整页截图
+  // 证据留存：本缺陷是「渲染成 $0.0」的可见问题，除断言外额外抓一张截图
   // 到 evidence/ 并 attach 到 HTML 报告，使评审人无需重跑即可看到真实页面状态。
+  // 截图注意两点（早期版本截出白屏的根因）：
+  //   1. 必须用 beforeAll 里真正加载好的 page（模块级变量），而非 test fixture
+  //      自动分配的空白 page —— 后者从没 goto 过任何地址，截出来是纯白屏；
+  //   2. 正文全在跨域 iframe 内，且可比表仅在「Comps」Tab 激活时可见（display:none
+  //      时截不出内容）。因此先切到 Comps Tab，再直接截 iframe 内的 .comps-grid
+  //      元素（锁定 EV / Market cap 两列的 $0.0），跨域 OOPIF 整页截图留白问题也规避。
   // （视频由 playwright.config.ts 的 video:'retain-on-failure' 自动留存在 test-results/）
-  test('EV 与 Market cap 应有真实数值（当前全部为 $0.0，已知缺陷）', async ({ page }, testInfo) => {
+  test('EV 与 Market cap 应有真实数值（当前全部为 $0.0，已知缺陷）', async ({}, testInfo) => {
     const FLOOR = 1e9; // 十亿级：可比公司（AMD/INTC/NVDA/QCOM/TSM/ARM/AVGO/MRVL）均为超大盘
     const bad = data.comps
       .filter((c) => {
@@ -197,10 +203,17 @@ test.describe('可比公司 @data', () => {
       })
       .map((c) => `${c.ticker}: EV=${c.ev} MC=${c.marketCap}`);
 
-    // 抓证据：整页截图（含 iframe 里的可比表），$0.0 会在图中清晰可见
+    // 抓证据：切到 Comps Tab → 等比表可见 → 截该表元素（含 $0.0 的 EV/MC 列）
+    const frame = await dashboardFrame(page);
+    const compsTab = frame
+      .locator('.tab-underline .tab-item', { hasText: 'Comps' })
+      .first();
+    await compsTab.click();
+    const grid = frame.locator('.comps-grid');
+    await expect(grid, '切到 Comps Tab 后可比表应可见').toBeVisible({ timeout: 30_000 });
     const shotPath = path.join('evidence', 'comps-ev-mc-zero.png');
     mkdirSync('evidence', { recursive: true });
-    await page.screenshot({ path: shotPath, fullPage: true });
+    await grid.screenshot({ path: shotPath });
     await testInfo.attach('comps-ev-mc-zero', {
       path: shotPath,
       contentType: 'image/png',
