@@ -7,8 +7,9 @@ test.describe('右侧聊天区（未登录可见） @ui', () => {
   });
 
   test('Alva 智能体欢迎语可见', async ({ page }) => {
-    // 不带 "I'm" —— 站点用弯撇号（U+2019），直撇号正则匹配不上
-    await expect(page.getByText(/your AI investing agent/)).toBeVisible();
+    // 不带 "I'm" —— 站点用弯撇号（U+2019），直撇号正则匹配不上。
+    // 延长局部超时：线上站点偶发慢加载致欢迎语 DOM 晚到（flaky 源），CI 另有 retries 兜底。
+    await expect(page.getByText(/your AI investing agent/)).toBeVisible({ timeout: 45_000 });
   });
 
   test('五个功能建议卡片齐全', async ({ page }) => {

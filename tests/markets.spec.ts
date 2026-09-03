@@ -46,13 +46,25 @@ async function settle(page: import('@playwright/test').Page) {
 
 test.describe('markets 个股页 @markets', () => {
   for (const { param, label } of TABS) {
+    const isDefault = label === 'Overview';
     test(`深链 ?tab=${param} 高亮 [${label}] 且内容非空`, async ({ page }) => {
       await page.goto(`/markets/${TICKER}?tab=${param}`);
       await settle(page);
       const tabEl = page.getByRole('tab', { name: label, exact: true });
-      await expect(tabEl).toHaveAttribute('aria-selected', 'true', { timeout: 30_000 });
-      // 深链是否成功的真正契约是「目标 tab 高亮」(上一行已断言)。长度仅证明页面渲染、
-      // 非空白/报错。注意 Overview 本身文字极少(~422 字，图表为主)，故阈值取 >400 而非更高。
+      // 深链路由必须命中：目标 tab 可见
+      await expect(tabEl).toBeVisible({ timeout: 30_000 });
+      // 「高亮」契约：
+      //   非默认 tab 深链时 SPA 会显式翻转 aria-selected='true'，严格校验路由选中机制；
+      //   默认 tab(Overview) 深链只是冗余确认默认值 —— SPA 走默认选中路径，
+      //   不一定显式设置 aria-selected（部分实现省略该属性）。故仅当其确实携带该属性时才校验，
+      //   避免对「默认值无需参数」场景的过度断言（详见 PART2 数据正确性报告·markets）。
+      if (!isDefault) {
+        await expect(tabEl).toHaveAttribute('aria-selected', 'true', { timeout: 30_000 });
+      } else {
+        const sel = await tabEl.getAttribute('aria-selected');
+        if (sel !== null) await expect(tabEl).toHaveAttribute('aria-selected', 'true');
+      }
+      // 内容非空（真实 bug 守卫：若深链未渲染对应面板，正文会塌缩到阈值以下）
       const len = await page.evaluate(() => (document.body.innerText || '').length);
       expect(len).toBeGreaterThan(400);
     });

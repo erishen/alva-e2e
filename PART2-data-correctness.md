@@ -84,7 +84,7 @@
 | `comps.spec.ts` | 可比公司 | `@data` | 11 | AMD 在表、财年对齐、毛利/EBITDA≤营收、股价为正、P/E 合法、跨表勾稽、股价=SPOT、**EV/MC 真实值（$0.0 缺陷 D-1）**、汇总行边界 |
 | `risk.spec.ts` | 风险表 | `@data` | 8 | 数量/字段、优先级枚举、趋势枚举、名称不重复、信号日期非未来、信号≤90 天、**管道健康≥1/30 天**、信号文本实质、分类多维 |
 | `freshness.spec.ts` | 数据新鲜度 | `@data` | 6 | 快照≤2 天、股价≤7 天、财报≤120 天、评级≤7 天、时间戳可解析、已报告期间<今天 |
-| `markets.spec.ts` | markets 个股页 | `@markets` | 5 | 深链高亮、价格≠$0.0、Alva Agent 伴侣区、资源路由 200、F-8 错参回退 ×2 |
+| `markets.spec.ts` | markets 个股页 | `@markets` | 5 | 深链高亮（默认 tab 仅 `aria-selected` 属性存在时校验，避免过度断言）、价格≠$0.0、Alva Agent 伴侣区、资源路由 200、F-8 错参回退 ×2 |
 
 > *用例数为 `test(...)` 声明数；`tabs.spec.ts`、`markets.spec.ts` 含参数化展开，实际执行更多。合计 **91 条声明**（参数化展开后实际执行约 98，即 97 passed + 1 failed，见 §5 / PART1 附录 C）。`npm run test:data`（`--grep @data`）覆盖 7 个 `@data` spec；`npm run test:ui-only` 覆盖 4 个 `@ui` spec。
 
