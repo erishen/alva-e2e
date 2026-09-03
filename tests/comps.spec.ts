@@ -1,4 +1,6 @@
-import { test, expect, Page, Browser } from '@playwright/test';
+import { test, expect, Page, Browser, type TestInfo } from '@playwright/test';
+import { mkdirSync } from 'fs';
+import path from 'path';
 import { loadDashboard, DashboardData } from './helpers/common';
 import { kpi, FinTable, CompRow } from './helpers/extract';
 import { parseMoney, parseMultiple, isEmptyValue } from './helpers/parse';
@@ -181,7 +183,11 @@ test.describe('可比公司 @data', () => {
   // 这样数据回归不会让这个 bug 悄悄溜过。
   // 守卫强度：不仅拒绝 0 / 空，还要求量级达到十亿级（可比公司均为超大盘，
   // 任一 EV/市值 < $1B 即视为取数错误或算错，避免缺陷被「修成别的非零错值」悄悄放过）。
-  test('EV 与 Market cap 应有真实数值（当前全部为 $0.0，已知缺陷）', () => {
+  //
+  // 证据留存：本缺陷是「渲染成 $0.0」的可见问题，除断言外额外抓一张整页截图
+  // 到 evidence/ 并 attach 到 HTML 报告，使评审人无需重跑即可看到真实页面状态。
+  // （视频由 playwright.config.ts 的 video:'retain-on-failure' 自动留存在 test-results/）
+  test('EV 与 Market cap 应有真实数值（当前全部为 $0.0，已知缺陷）', async ({ page }, testInfo) => {
     const FLOOR = 1e9; // 十亿级：可比公司（AMD/INTC/NVDA/QCOM/TSM/ARM/AVGO/MRVL）均为超大盘
     const bad = data.comps
       .filter((c) => {
@@ -190,6 +196,16 @@ test.describe('可比公司 @data', () => {
         return ev === 0 || mc === 0 || ev === null || mc === null || ev < FLOOR || mc < FLOOR;
       })
       .map((c) => `${c.ticker}: EV=${c.ev} MC=${c.marketCap}`);
+
+    // 抓证据：整页截图（含 iframe 里的可比表），$0.0 会在图中清晰可见
+    const shotPath = path.join('evidence', 'comps-ev-mc-zero.png');
+    mkdirSync('evidence', { recursive: true });
+    await page.screenshot({ path: shotPath, fullPage: true });
+    await testInfo.attach('comps-ev-mc-zero', {
+      path: shotPath,
+      contentType: 'image/png',
+    });
+
     expect(bad, `以下公司 EV/市值 为 0 / 空 / 或量级异常（已知取数缺陷）：${bad.join(' ; ')}`).toEqual([]);
   });
 });
