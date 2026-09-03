@@ -8,5 +8,6 @@ dist/
 .env.local
 
 # Part 1 导出的登录态（含会话 token，切勿提交）
+part1
 part1/.auth/
 .auth/

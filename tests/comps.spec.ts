@@ -175,14 +175,21 @@ test.describe('可比公司 @data', () => {
     });
   });
 
-  // 已知数据缺陷（已验证，见 /tmp/alva-comps.txt 抓取的真 DOM）：
+  // 已知数据缺陷（已在 /markets/AMD 可比表真机验证）：
   // 可比表的 EV 与 Market cap 两列全部渲染成 $0.0（数据没取到，并非真实为零）。
   // 作为正式用例保持「活跃失败」状态 —— 缺陷修复后本例会变绿，套件整体也回归全绿；
   // 这样数据回归不会让这个 bug 悄悄溜过。
+  // 守卫强度：不仅拒绝 0 / 空，还要求量级达到十亿级（可比公司均为超大盘，
+  // 任一 EV/市值 < $1B 即视为取数错误或算错，避免缺陷被「修成别的非零错值」悄悄放过）。
   test('EV 与 Market cap 应有真实数值（当前全部为 $0.0，已知缺陷）', () => {
+    const FLOOR = 1e9; // 十亿级：可比公司（AMD/INTC/NVDA/QCOM/TSM/ARM/AVGO/MRVL）均为超大盘
     const bad = data.comps
-      .filter((c) => parseMoney(c.ev) === 0 || parseMoney(c.marketCap) === 0)
+      .filter((c) => {
+        const ev = parseMoney(c.ev);
+        const mc = parseMoney(c.marketCap);
+        return ev === 0 || mc === 0 || ev === null || mc === null || ev < FLOOR || mc < FLOOR;
+      })
       .map((c) => `${c.ticker}: EV=${c.ev} MC=${c.marketCap}`);
-    expect(bad, `以下公司 EV/市值为 0（已知取数缺陷）：${bad.join(' ; ')}`).toEqual([]);
+    expect(bad, `以下公司 EV/市值 为 0 / 空 / 或量级异常（已知取数缺陷）：${bad.join(' ; ')}`).toEqual([]);
   });
 });

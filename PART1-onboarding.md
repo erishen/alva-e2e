@@ -1,12 +1,14 @@
 # Alva 探索式 QA 报告 — Part 1：登录链路与产品体验
 
-> **交付物性质**：本文件是 alva.ai AI-Native QA 笔试 **Part 1 的硬性交付物**——针对登录链路（注册 → 建 Portfolio Watch Automation → 建 Playbook → 收 Alert）的探索式测试与问题报告。
+> **交付物性质**：本文件是 alva.ai AI-Native QA 笔试 **Part 1 的硬性交付物**——针对登录链路（注册 → 建 Portfolio Watch Automation → 建 Playbook → 收 Alert）的探索式测试与问题报告。本报告另含**数据正确性套件（Part 2）的运行证据**，见文末 **附录 C**。
 >
 > **执行方式**：AI 辅助探索（Playwright 探针 + 自动化套件）+ 人肉走查（评审人在本机真实浏览器走查，纠正 AI 误判）。
 >
 > **状态**：初稿。自动化发现的结论已定稿；视觉 / 交互 / 移动端 / 边界类发现待走查补充（见文末模板槽）。
 >
 > **边界声明**：注册走 Google SSO（无密码），自动化套件不重放登录，仅复用评审人手动登录后导出的 `storageState`。
+>
+> **仓库范围**：本文档是本仓库的交付物；`part1/` 下的登录态套件（`onboarding/journey/markets.spec.ts`）、探索探针（`probes/*.mjs`）与 `export-state.mjs` 均为**本地运行产物，不纳入本仓库**（需 Alva SSO 会话，无法进 CI）。下文以文件名引用它们作为证据轨迹，不代表这些文件随仓库分发。
 
 ---
 
@@ -165,7 +167,7 @@
 
 ### 2.1 Part 1 ↔ Part 2 衔接：markets 个股页测试区（✅ 已落地）
 
-markets 页同时是 **Part 1 旅程终点**（alert 点 AMD 进入）与 **Part 2 数据正确性出口**（真实行情渲染），是最值得补衔接测试的区域。**已实现为 `part1/markets.spec.ts`（11 条用例全绿）**，覆盖：
+markets 页同时是 **Part 1 旅程终点**（alert 点 AMD 进入）与 **Part 2 数据正确性出口**（真实行情渲染），是最值得补衔接测试的区域。**已实现为 `tests/markets.spec.ts`（11 条用例全绿，公开页测试、已纳入本仓库、可进 CI）**，覆盖：
 
 1. **深链定位**（6 条）：`?tab=overview|narratives|anomalies|newsSocial|smartMoney|earnings` 各自高亮对应 tab（`aria-selected=true`）且内容非空（防静默回退回归，编码 F-8 规范值）。
 2. **命名一致性回归守卫**（2 条）：对 `news` / `smart-money` 等"直觉错参"断言**当前确实静默回退 Overview**（F-8 现状），并加 `TODO` 注释——规范修复后翻转断言即可变红提醒。
@@ -237,19 +239,22 @@ markets 页同时是 **Part 1 旅程终点**（alert 点 AMD 进入）与 **Part
 |---|---|---|---|
 | `part1/onboarding.spec.ts` | 5 | **5 passed (29.4s)** | 登录链路：工作台 / Explore / 首页快捷入口 / 聊天输入 / AI 一致性 |
 | `part1/journey.spec.ts` | 3 | **3 passed (22.0s)** | 旅程空状态骨架：Portfolio 空状态 / Alerts 空状态 / 聊天发指令 |
-| `part1/markets.spec.ts` | 11 | **11 passed (1.8m)** | **Part 1↔Part 2 衔接**：6 个规范 `?tab=` 深链 / 行情非零（衔接 Part 2 `$0.0`）/ Alva Agent 伴侣区 / 带 ID 资源路由 / F-8 错参静默回退回归守卫 |
+| `tests/markets.spec.ts`（已迁入公开套件） | 11 | **11 passed (1.8m)** | **Part 1↔Part 2 衔接**：6 个规范 `?tab=` 深链 / 行情非零（衔接 Part 2 `$0.0`）/ Alva Agent 伴侣区 / 带 ID 资源路由 / F-8 错参静默回退回归守卫 |
 
-**运行**（需先 `node part1/export-state.mjs` 手动 SSO 登录导出会话）：
+> 注：`part1/` 的 `onboarding` / `journey` 套件与探针为**本地运行产物，未纳入本仓库**（需 Alva SSO 会话，无法进 CI），上表用例数来自本机运行，作为历史证据留存。`markets.spec.ts` 测的是公开页 `/markets/<ticker>`（断言不依赖登录态），已迁入 `tests/` 纳入本仓库、可进 CI，与 `comps.spec.ts` 组成同页「UI + 数据」双覆盖。本仓库最终含本文档 + `tests/`（数据正确性 + markets UI 衔接）。
+
+**运行**：
+- Part 1 本地登录套件（本机 `part1/`，未纳入本仓库；需先 `node part1/export-state.mjs` 手动 SSO 登录导出会话）：
 ```bash
-# 全量（19 条）
-npx playwright test --config part1/playwright.config.ts
-# 仅跑 Part 1↔Part 2 衔接套件（markets 个股页）
-npx playwright test --config part1/playwright.config.ts --grep "@markets"
-# 仅列出用例（不执行，校验测试发现）
-npx playwright test --config part1/playwright.config.ts --list
+npx playwright test --config part1/playwright.config.ts          # onboarding+journey 共 8 条
+npx playwright test --config part1/playwright.config.ts --list  # 仅列出用例
+```
+- markets 个股页 UI 衔接（已纳入 `tests/`，公开页、可进 CI）：
+```bash
+npx playwright test --grep "@markets"        # 使用根配置（tests/）
 ```
 
-> **探索探针（`part1/probes/`，25 个一次性脚本）**：不属回归套件、不进 CI，是**本报告中每条发现的证据轨迹**——写断言前先用它们确认产品真实行为，每条都可重跑复现。命名约定：`probe-*`（探索性，边跑边看）/ `verify-*`（验证性，确认已提出的假设）。详见 [`part1/probes/README.md`](./part1/probes/README.md)。
+> **探索探针（`part1/probes/`，25 个一次性脚本，本地运行、未纳入本仓库）**：不属回归套件、不进 CI，是**本报告中每条发现的证据轨迹**——写断言前先用它们确认产品真实行为，每条都可重跑复现。命名约定：`probe-*`（探索性，边跑边看）/ `verify-*`（验证性，确认已提出的假设）。其本地说明见 `part1/probes/README.md`（该目录不随本仓库分发，仅作证据轨迹索引）。
 
 **注意**：Alva 后端为海外模型，AI 一致性用例受跨境延迟影响，CI 中偶发超时属预期（非产品 bug）。
 
@@ -306,3 +311,115 @@ npx playwright test --config part1/playwright.config.ts --list
 ## 附录 B：与 Part 2 的缺陷对照
 
 Part 2 套件抓到 Playbook Comp 表 EV/Market cap 全 `$0.0`。本次在 `/markets/AMD` 探到 AMD 实时价 **$457.06（真实）**，说明该 `$0.0` 缺陷**仅限 Playbook Comp 表数据管线，非全局行情源故障**——定位更精准，反而增强报告说服力。
+
+---
+
+## 附录 C：运行证据（Run Evidence）
+
+> 本附录记录**数据正确性套件（Part 2）**的全量运行结果（97 passed + 1 failed，即 `$0.0` 真实数据缺陷）。Part 1 自身登录态用例（onboarding+journey 共 8 条，需 SSO；markets 页 UI 测试已迁入 `tests/`，见 §5）的结果见 §5。等价 CI 日志。
+
+环境：Playwright 1.62.1 + Chromium，macOS，直连 `https://alva.ai`（无本地服务）。
+完整运行命令：`npx playwright test --workers=1 --retries=0 --reporter=list`
+
+---
+
+### 证据 A：全量运行（97 passed · 1 failed，约 2.6 min）
+
+> 1 个 failed 即 `comps.spec.ts` 抓到的真实数据缺陷（可比表 EV / Market cap 全为 `$0.0`）。
+> 其余 97 条覆盖数据完整性 / 行情 KPI / 财报 / 可比公司交叉校验 / 估值 / 风险 / 新鲜度 / 外壳 / Tab / 聊天 / 元信息，全部通过。
+
+关键通过项摘录：
+
+```
+✓ 数据完整性 › 页面无 NaN / undefined / null / [object Object] 等渲染错误占位
+✓ 数据完整性 › 财报表与风险表都渲染出数据行
+✓ 数据完整性 › 每张表的数据行列数与其表头一致
+✓ 数据完整性 › 营收占比图例齐全且总和为 100%
+✓ 行情 KPI   › 52 周高点必须不低于当前股价
+✓ 行情 KPI   › 「距高点回撤」可由股价与 52 周高点算出（交叉校验）
+✓ 行情 KPI   › 涨跌方向的样式标记与数值符号一致（涨红跌绿不反向）
+✓ 财报数据   › 年度营收逐年增长（AMD 增长叙事，倒退即异常）
+✓ 财报数据   › 毛利率落在 0~100% 区间内
+✓ 财报数据   › EBITDA 不低于同期营业利润
+✓ 可比公司   › 【跨表校验】AMD 的营收与年度财报表完全一致
+✓ 可比公司   › 【跨表校验】AMD 的 EBITDA 与年度财报表完全一致
+✓ 可比公司   › 【跨组件校验】可比表 AMD 股价与行情 SPOT 一致
+✓ 估值与评级 › 【跨表校验】市值 ÷ P/S 等于季度表算出的 TTM 营收
+✓ 估值与评级 › 【跨表校验】P/E 与 TTM 每股收益方向一致
+✓ 风险表     › 优先级只能是 High / Medium / Low
+✓ 风险表     › 趋势只能是 stable / improving / worsening
+✓ 数据新鲜度 › 行情快照更新时间不晚于今天且不超过 2 天
+```
+
+失败项（即巡检抓到的真实数据缺陷）：
+
+```
+✗ 可比公司 › EV 与 Market cap 应有真实数值（当前全部为 $0.0，已知缺陷）
+
+   以下公司 EV/市值为 0（已知取数缺陷）：
+     [ "AMD: EV=$0.0 MC=$0.0",
+       "INTC: EV=$0.0 MC=$0.0",
+       "NVDA: EV=$0.0 MC=$0.0",
+       "QCOM: EV=$0.0 MC=$0.0",
+       "TSM:  EV=$0.0 MC=$0.0",
+       "ARM:  EV=$0.0 MC=$0.0",
+       "AVGO: EV=$0.0 MC=$0.0",
+       "MRVL: EV=$0.0 MC=$0.0",
+       "All-peer average: EV=$0.0 MC=$0.0",
+       "All-peer median:  EV=$0.0 MC=$0.0" ]
+
+    at tests/comps.spec.ts:186:61
+```
+
+> 注意：同表的 Revenue / GP / EBITDA / P/E 均正常填充，唯独 EV 与 Market cap 为 `$0.0`，
+> 说明是这两列的取数缺失，而非全局限流或加载失败。缺陷已固化为活跃失败用例，
+> 修复后该条会变绿、套件整体回归全绿。
+
+---
+
+### 证据 B：单文件复跑（comps.spec.ts · 11 passed · 1 failed，14.6s）
+
+为隔离验证「红用例确实在抓 bug、而非限流误伤」，单独复跑 `comps.spec.ts`：
+除 EV/MC 这条外，其余 11 条（含 3 条跨表交叉校验）全部通过，且页面数据正常加载
+（证实 `$0.0` 是列级取数缺陷，不是加载失败）。失败 diff 同上。
+
+---
+
+### 证据 C：二次复验（时隔 5 小时 · 新数据快照 · 97 passed · 1 failed · 3.0 min）
+
+> 页面每约 4 小时自动刷新数据快照。为排除「`$0.0` 只是某一次加载失败的偶发现象」，
+> 于**首跑 5 小时后（数据快照已刷新一轮）独立重跑全量**，结果**与证据 A 完全一致**：
+
+```
+97 passed (3.0m)
+1 failed —— tests/comps.spec.ts:186 › EV 与 Market cap 应有真实数值（当前全部为 $0.0）
+
+   AMD / AVGO / INTC / NVDA / QCOM / MRVL / TSM
+   + Average / Median / All-peer average / All-peer median  → 全部 EV=$0.0 MC=$0.0
+```
+
+**这条复验的价值在于排除竞争性解释**：
+
+| 若只跑一次，无法排除 | 二次复验后的判定 |
+|---|---|
+| 站点限流导致数据没加载出来 | ❌ 排除：同表 Revenue / GP / EBITDA / P/E **均正常填充**，唯独 EV 与 MC 两列为 0；且其余 97 条（含 3 条跨表交叉校验）全绿 |
+| 单次缓存串号 / 偶发渲染故障 | ❌ 排除：相隔 5 小时、**不同数据快照**下稳定复现同一现象 |
+| → | ✅ 判定为**稳定的列级取数缺陷**（EV / Market cap 两列的数据管线取数失败），而非环境或限流噪声 |
+
+> 附注：两次运行列出的公司集合略有差异（首跑含 ARM，复跑无 ARM，但均含 Average/Median 汇总行）。
+> 这说明可比公司列表本身会随快照浮动，而**缺陷在所有快照下恒定存在**——进一步佐证其稳定性。
+
+其余 97 条跨两个数据快照均通过，也说明套件本身**不脆弱**（未因页面刷新而产生 flaky）。
+
+---
+
+### 如何复现
+
+```bash
+npm install
+npx playwright install chromium
+npx playwright test --workers=1 --reporter=list
+# 期望：97 passed + 1 failed（failed = 已知的 $0.0 数据缺陷）
+# 只看数据正确性绿集：npm run test:data  （含该红用例，仍会红）
+# 跳过已知缺陷看其余全绿：npx playwright test --grep-invert "EV 与 Market cap"
+```

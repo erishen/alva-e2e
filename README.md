@@ -1,11 +1,11 @@
 # alva-e2e
 
-对 [alva.ai](https://alva.ai) 公开 playbook 页面的 **Playwright 数据正确性测试**套件。
+A **Playwright data-correctness test** suite for the public playbook pages on [alva.ai](https://alva.ai).
 
-本项目的核心目标不是 UI / 多端样式，而是**验证页面里的数据对不对**：
-数字有没有算错、跨表口径是否一致、有没有脏值 / 占位符残留、枚举值是否合法、更新是否新鲜。
+The core goal is **not** UI / multi-device styling — it is **verifying whether the data on the page is actually correct**:
+are the numbers computed right, are cross-table figures consistent, are there dirty values / leftover placeholders, are the enum values valid, is the data fresh.
 
-默认被测对象（AMD 深度报告）：
+Default target (the AMD deep-dive report):
 
 ```
 https://alva.ai/u/lake/playbooks/amd-deep-dive
@@ -13,141 +13,178 @@ https://alva.ai/u/lake/playbooks/amd-deep-dive
 
 ---
 
-## 应聘提交说明（Alva · AI-Native QA 笔试）
+## Submission notes (Alva · AI-Native QA take-home)
 
-> 本仓库交付笔试的**两部分**，建议按此顺序阅读：
+> This repo delivers **both parts** of the take-home. Suggested reading order:
 >
-> | 部分 | 交付物 | 内容 |
+> | Part | Artifact | Contents |
 > |---|---|---|
-> | **Part 2**（本 README 主体） | `tests/` 共 12 个 spec（另有 `helpers/` 提取层） | 已发布公开 Playbook（AMD Deep-Dive）的**生产环境金融数据巡检**套件，**97 passed + 1 failed**（那 1 个红是真抓到的数据缺陷），对应 JD 核心职责「生产环境质量巡检……金融数据正确性」 |
-> | **Part 1** | [`PART1-onboarding.md`](./PART1-onboarding.md) | 登录链路「注册 → 建 Portfolio Watch Automation → 建 Playbook → 收 Alert」的**探索式测试报告**，9 条发现（F-1~F-9）+ **19 条登录态用例全绿** |
+> | **Part 2** (the body of this README) | `tests/` — 13 specs (7 `@data` + 4 `@ui` + 1 `@markets` + 1 `@smoke`, plus a `helpers/` extraction layer) | A **production financial-data巡检 (patrol)** suite for the published public Playbook (AMD Deep-Dive): **97 passed + 1 failed** (the 1 red is a real data defect it caught), matching the JD's core responsibility "production-quality patrol … financial data correctness" |
+> | **Part 1** | [`PART1-onboarding.md`](./PART1-onboarding.md) | An **exploratory testing report** of the login journey "sign up → create Portfolio Watch Automation → create Playbook → receive Alert": 9 findings (F-1~F-9) + logged-in test cases, all green (onboarding/journey: 8, SSO-required; the markets stock-page UI suite is merged into the public `tests/` suite) |
 >
-> 运行证据见 [`EVIDENCE.md`](./EVIDENCE.md)。下面三节按笔试要求说明（以 Part 2 为主，因其为自动化交付主体）。
+> Run evidence is in [`PART1-onboarding.md`](./PART1-onboarding.md) (Appendix C). The three sections below follow the take-home requirements (Part 2 first, since it is the automated deliverable).
 
-### 1. 为什么选「Playbook 数据正确性」这个场景（而不是另一个）
+### 1. Why "Playbook data correctness" (and not another scenario)
 
-笔试 Part 1 的旅程是「注册 → 建 Portfolio Watch Automation → **建 Playbook** → 收 Alert」，全部在登录态下。**Playbook 正是这条旅程的第三环**，因此本套件测试的「已发布公开 Playbook（AMD Deep-Dive）的数据正确性」落在题目「任选 Part 1 一场景」的范围内。我刻意**没有**把自动化测试放在登录链路本身，理由：
+The Part 1 journey is "sign up → create Portfolio Watch Automation → **create Playbook** → receive Alert", all behind auth. **The Playbook is the third step of that journey**, so testing "the data correctness of a published public Playbook (AMD Deep-Dive)" sits squarely inside the take-home's "pick any one Part 1 scenario" scope. I deliberately **did not** put the automation on the login journey itself, for these reasons:
 
-- **数据 bug 是最深的 bug。** 一条涨跌幅符号反向、一个市值数量级错一位，对投资用户是实打实的亏损，比十条 UI 对齐问题都严重。JD 把「金融数据正确性」单列为核心职责，正是这个判断。
-- **公开页面可无人值守巡检。** 登录链路每次跑都要真实账号 + 反爬 + 限流，不适合做常态化回归；而公开 Playbook 能在 CI 里定时跑，真正起到「生产环境巡检」作用。
-- **它能做出有说服力的交叉校验。** 同一个指标（AMD 营收、EBITDA、股价）在「财报表」「可比公司表」「行情 KPI」三处各出现一次，互相必须相等——这类断言能抓出取数口径不一致、单位换算错、缓存串号等**单看任一边都发现不了**的真实故障。本套件确实抓到了一个：`comps.spec.ts` 里「EV / Market cap 应有真实数值」这条用例**当前是红色的**，因为可比表里所有公司的 EV 与 Market cap 都渲染成了 `$0.0`（数据没取到，并非真实为零）。
-- 登录链路（Part 1 旅程）我没有丢弃，而是作为**互补的独立套件**——见 `part1/`（需登录态，故独立于本套件、不进 CI）：`onboarding.spec.ts` 5 条 + `journey.spec.ts` 3 条 + `markets.spec.ts` 11 条，**19 条全绿**；探索结论与 9 条发现见 [`PART1-onboarding.md`](./PART1-onboarding.md)。其中 `markets.spec.ts` 是 **Part 1 ↔ Part 2 的衔接区**：markets 个股页既是 alert 的落地页、又是行情数据的出口，其「价格形如 `$X.XX` 且非零」断言正好与 Part 2 的 `$0.0` 缺陷形成对照。
+- **Data bugs are the deepest bugs.** A reversed gain/loss sign, or a market cap off by one order of magnitude, is real money lost for an investing user — far worse than ten UI alignment nits. The JD singles out "financial data correctness" as a core responsibility precisely because of this.
+- **Public pages can be patrolled unattended.** The login journey needs a real account + anti-bot + rate limiting on every run, so it doesn't suit routine regression. A public Playbook can run on a CI timer and genuinely serve as "production patrol".
+- **It enables convincing cross-checks.** The same metric (AMD revenue, EBITDA, share price) appears once each in the financials table, the comps table, and the quote KPI — and they must all agree. Assertions like these catch real failures (inconsistent fetch口径 / unit-conversion errors / cache cross-wiring) that **no single side would reveal on its own**. This suite did catch one: in `comps.spec.ts`, the assertion "EV / Market cap should be real values" is **currently red**, because every company's EV and Market cap in the comps table render as `$0.0` (data not fetched, not actually zero).
+- The login journey (Part 1) is not discarded — it is covered by a **complementary standalone logged-in suite** (requires auth, hence separated from this suite and not committed to this repo): 19 tests across onboarding / journey / markets specs, **all green**; the exploration and 9 findings are in [`PART1-onboarding.md`](./PART1-onboarding.md). Its markets spec is the **bridge between Part 1 and Part 2**: the markets stock page is both the alert landing page and the quote-data outlet, and its assertion "price looks like `$X.XX` and is non-zero" directly contrasts with Part 2's `$0.0` defect.
 
-### 2. AI 在工作流里做了什么，我又否决 / 修改了什么
+### 2. What the AI did in the workflow, and what I overrode / corrected
 
-本项目的代码几乎全部由一个 AI 编码 Agent（WorkBuddy）在对话中生成，我（应聘者）负责**定方向、审断言、纠偏**。几个关键节点：
+Almost all of this project's code was generated in conversation by an AI coding agent (WorkBuddy); I (the candidate) set direction, reviewed assertions, and corrected course. Key moments:
 
-- **Agent 最初按旧项目模板，把重点放在 UI / 多端样式**（Tab 切换、响应式视口）。我明确叫停：「重点是测数据，不是多端样式」，Agent 据此把整套重心翻转为数据正确性，并删掉了 mobile project。
-- **Agent 用 `getByText(..., { exact: true })` 匹配公司名，在 iframe 里全军覆没**（公司名 textContent 是 `Advanced Micro Devices\n AMD · NASDAQ`，精确匹配永远不中）。我让它改为基于 `role=heading` / 包含匹配，并据此修好了所有相关断言。
-- **Agent 写了 `first()` 命中隐藏引导句**的坑（Thesis 面板里 `first()` 先命中了隐藏的 "…the AMD bull case…" 而非可见标题）。我让它加 `filter({ visible: true })` 修正。
-- **Agent 一条业务假设过度**（断言「EBITDA ≤ 毛利」）。我指出晶圆代工厂（如 TSM）折旧计入营业成本会压低毛利、加回折旧后 EBITDA 反超属正常会计表现——Agent 据此把硬边界收敛为「EBITDA ≤ 营收」。
-- **Agent 把欢迎语正则写成直撇号 `'`**，而站点用的是弯撇号 `’`（U+2019）。我让它改用无撇号的特征短语。
-- **脏值扫描误报**（全文本里某英文单词含 `null` 子串）。我让它把扫描范围从「整页 innerText」收窄到「数据单元格」，消除误报。
-- **我把「1 次加载、多次断言」的共享 page 机制定为目标**：Agent 最初每个用例独立加载慢速 iframe，全量跑 38 分钟且限流翻车；改成 `beforeAll` 共享一页后，全量降到 2.5 分钟、97 条用例通过。
+- **The agent first followed an old project template and focused on UI / multi-device styling** (tab switching, responsive viewports). I explicitly stopped it: "the point is testing data, not multi-device styling." The agent then flipped the whole focus to data correctness and dropped the mobile project.
+- **The agent matched company names with `getByText(..., { exact: true })` and got wiped out inside the iframe** (the company name textContent is `Advanced Micro Devices\n AMD · NASDAQ`, so exact matching never hits). I had it switch to `role=heading` / substring matching and fixed every related assertion accordingly.
+- **The agent's `first()` hit a hidden intro sentence** (in the Thesis panel, `first()` matched the hidden "…the AMD bull case…" instead of the visible heading). I had it add `filter({ visible: true })` to fix it.
+- **The agent over-asserted one business assumption** ("EBITDA ≤ gross profit"). I pointed out that for foundries (e.g. TSM) depreciation hits COGS and lowers gross profit, so EBITDA rebounding above gross profit after add-back is normal accounting — the agent then tightened the hard bound to "EBITDA ≤ revenue".
+- **The agent wrote the welcome-message regex with a straight apostrophe `'`**, while the site uses a curly apostrophe `’` (U+2019). I had it switch to an apostrophe-free feature phrase.
+- **Dirty-value scan false positive** (an English word somewhere in the full text contains the substring `null`). I had it narrow the scan from "whole-page innerText" to "data cells" to kill the false positive.
+- **I set the "load once, assert many" shared-page mechanism as the target**: the agent initially loaded the slow iframe independently per case — a full run took 38 min and tripped rate limits; after switching to a single shared page in `beforeAll`, the full run dropped to ~2.5 min with 97 cases passing.
 
-### 3. 即使全绿，我仍然不放心的地方（没覆盖什么）
+### 3. Even all-green, what I still don't trust (what's not covered)
 
-- **只覆盖一个 Playbook、一个时间点。** 这是 AMD 单一标的的快照。其他 Playbook（不同行业 / 不同数据密度）可能暴露不同的渲染或取数问题；且页面每约 4 小时刷新，我无法保证每次刷新后结构不变。
-- **交叉校验是「内部一致性」，不是「对外部真相」。** 市值 ÷ P/S 反推营收、Comps 表 vs 财报表同口径——这些都只在页面**内部**互验。如果 Alva 后端**所有数据源同时错了**（如汇率、单位基准），套件会全绿却仍是错的。要真正防住，需要引入一个外部 ground-truth（如 SEC/行情 API）做三方比对，本套件未做。
-- **限流让运行本身不稳定。** 站点对高频访问有明显限流（连续跑十几趟后 API 间歇返回空数据）。`npm test` 偶尔会因加载不出数据而失败，需要 `--workers=1` 串行重试。这意味着 CI 必须容忍偶发失败、或加预热/退避，否则会出假红。
-- **本套件（Part 2）不覆盖登录态——这是刻意的设计取舍，已由 Part 1 互补，但端到端仍是弱项。** 注册、Automation 创建、Alert 配置与推送因需真实账号而排除在本套件外（公开页面才能无人值守巡检）。Part 1 的 19 条用例补上了登录链路的**骨架级**覆盖（路由可达、空状态引导、深链定位、行情非零），但仍有两处我自动化不了：① **automation 是异步 LLM 工作流**（构建数分钟），我只能断言「指令进入对话」，无法断言「最终生成的 automation spec 正确」；② **alert 真实触发无法验证**——它要求 AMD 从 $457 实际跌破 $100，等待期不可控。这两处目前依赖人工走查，已在 `PART1-onboarding.md` §6 明确标注。
-- **`$0.0` 这条红用例是「已知缺陷跟踪」，不是「新 bug 探测器」。** 它只验证 EV/市值非 0。一旦该缺陷被修，这条会变绿；但它不会主动发现「EV 算错成别的数」这类更隐蔽的错误（需要值级校验，超出当前 scope）。
-
-### 运行与证据
-
-```bash
-make install      # 首次：装依赖 + Chromium
-make test         # 全量（直连 alva.ai，无需本地服务）
-make test-data    # 只跑数据正确性用例
-make report       # 打开 HTML 报告
-```
-
-- 全量运行日志见 [`EVIDENCE.md`](./EVIDENCE.md)：**97 passed + 1 failed**（那 1 个 failed 即上文抓到的 `$0.0` 真实数据缺陷），约 2.6~3.0 分钟跑完。
-- 该结果**经过二次独立复验**（时隔 5 小时、页面数据快照刷新后重跑，`97 passed + 1 failed` 完全一致），据此排除「限流 / 偶发加载失败」的竞争性解释，判定为稳定的列级取数缺陷 —— 详见 `EVIDENCE.md` **证据 C**。
-- 提交物即本仓库；运行证据为 `EVIDENCE.md` 中的列表式测试报告（等价 CI 日志）。
+- **Only one Playbook, one point in time.** This is a snapshot of a single AMD ticker. Other Playbooks (different sectors / data densities) may expose different rendering or fetch problems; and the page refreshes roughly every 4 hours, so I can't guarantee the structure stays put after each refresh.
+- **Cross-checks are "internal consistency", not "against external truth".** Market cap ÷ P/S back-solving revenue, comps table vs financials table same口径 — all only self-verify **within** the page. If Alva's backend were wrong on **all** data sources at once (e.g. FX rate, unit base), the suite would go all green yet still be wrong. Truly guarding against that needs an external ground-truth (e.g. SEC / quote API) for three-way comparison; this suite doesn't do that.
+- **Rate limiting makes the run itself unstable.** The site clearly rate-limits high-frequency access (after a dozen consecutive runs the API intermittently returns empty data). `npm test` can occasionally fail just from not loading data, needing `--workers=1` serial retries. That means CI must tolerate flaky failures, or add warm-up / back-off, or it'll produce false reds.
+- **This suite (Part 2) deliberately does not cover the auth state — a design trade-off, complemented by Part 1, but end-to-end is still weak.** Sign-up, Automation creation, and Alert config/push are excluded from this suite because they need a real account (only public pages can be patrolled unattended). Part 1's logged-in cases (onboarding/journey: 8) add **skeleton-level** coverage of the login chain (route reachable, empty-state guidance, deep-link targeting, non-zero quote), but two things I couldn't automate: ① **the automation is an async LLM workflow** (builds over minutes) — I can only assert "the instruction entered the conversation", not "the final generated automation spec is correct"; ② **real alert triggering can't be verified** — it requires AMD to actually fall from $457 through $100, an uncontrolled wait. Both currently rely on manual walkthrough and are flagged explicitly in `PART1-onboarding.md` §6.
+- **The `$0.0` red case is a "known-defect tracker", not a "new-bug detector".** It only asserts EV/market-cap ≠ 0. Once the defect is fixed this case goes green; but it won't proactively catch more subtle errors like "EV computed to a wrong number" (that needs value-level checks, beyond current scope).
 
 ---
 
-## 被测页面架构（写测试前必读）
+## Running
 
-页面是 **外壳 + iframe** 两层结构，这是所有选择器的出发点：
+### Prerequisites
 
-| 层 | 内容 | 定位方式 |
-|---|---|---|
-| 主文档（alva.ai） | 侧边栏、标题 "AMD Deep-Dive"、作者、README 徽章、右侧 Alva 聊天区 | 直接 `page.getByText(...)` |
-| `<iframe title="Dashboard">` | 真正的内容仪表盘（公司卡、7 个 Tab、KPI、财务表、Comps 表、风险表、评级、图表），src 指向 `lake.playbook.alva.ai`，路径带版本号（如 `v1.13.28`） | `dashboard(page)` helper（`page.frameLocator`） |
+- Node 22+, with network access to `https://alva.ai` (users in mainland China may need a proxy).
+- This suite **hits the live site directly**; no local server needs to be started.
 
-两个坑（数据测试尤其要命）：
+### Commands
 
-1. **数据渐进填充**：iframe 骨架先渲染（占位符是 `—` / `Loading…`），指标标签和数字可能 20~40 秒后才插入 DOM。数据类断言必须显式等待（helper 里的 `DATA_TIMEOUT = 60s`），绝不能假设元素立即可见。
-2. **内容加载偶发不稳定 + 限流**：站点对高频访问有限流迹象（连续跑十几趟后 API 会间歇性 200 但空数据）。因此 config 里 `fullyParallel: false`、`workers` 压到 1~2，且每个 spec 用 `beforeAll` **只加载一次页面、共享一个 page**，避免 N 个用例 × 独立加载把站点打挂。
-
-另外两个站点现状（测试里有注释固化）：
-
-- 整站**没有任何 h1~h6 语义化标题**（标题是 `<span class="page-header-title">`）。公司名在 iframe 内、且文本是 `Advanced Micro Devices\n AMD · NASDAQ`（h1 内嵌 span）—— 用 `exact: true` 会永远不中，必须改用 `role=heading` 或文本包含匹配。
-- 未登录时控制台会有 401/403（账户接口）和被墙统计脚本的噪音，属预期；`meta.spec.ts` 只断言无**未捕获** JS 异常。
-
-## 数据提取方式（关键设计）
-
-数据测试不是「肉眼看数字对不对」，而是**在浏览器侧把数据抽成结构化对象，再用纯函数断言**：
-
-```
-tests/helpers/extract.ts   → 浏览器内运行的提取器（page.evaluate），
-                             把 KPI / 财务表 / Comps 表 / 评级 / 风险 / 时间戳
-                             抽成 DashboardData 结构
-tests/helpers/parse.ts     → 纯函数：parseMoney / parsePct / parseDate / findDirtyValues
-tests/helpers/common.ts    → gotoPlaybook / dashboard / waitForDataReady / 共享 page 机制
-```
-
-为什么这样设计：
-
-- 页面很多数据在 DOM 里但**不可见**（如 `textContent` 能拿到 Annual financials / Risk 表，但 `innerText` 停在 Price performance）—— 数据测试必须用 `textContent` / `getAttribute`，不能只信可见性。
-- 把「抓取」和「校验」分离后，断言可以做得非常密：交叉校验、区间检查、枚举合法性、符号一致性都是纯逻辑，跑得快、报错信息清楚。
-
-## 测试文件
-
-| 文件 | 标签 | 覆盖 |
-|---|---|---|
-| `smoke.spec.ts` | `@smoke` | 页面可达 + iframe 内容最终渲染 |
-| `shell.spec.ts` | `@ui` | 外壳：标题、作者、徽章、描述、侧边栏导航 |
-| `tabs.spec.ts` | `@ui` | 7 个 Tab 栏 + 子 Tab 计数一致性（Tab 是滚动锚点，数据一次性在 DOM 里） |
-| `chat.spec.ts` | `@ui` | 聊天区：欢迎语、建议卡片、输入框可输入（**不发消息**） |
-| `meta.spec.ts` | `@ui` | iframe src、meta description、无 JS 异常、a11y 现状 |
-| `data-integrity.spec.ts` | `@data` | **全局脏值扫描**、数据结构齐全、营收占比图例总和 100%、空表格检查 |
-| `market-data.spec.ts` | `@data` | 行情 KPI + **可计算交叉校验**（52 周回撤 = f(股价, 高点)；市值 = 股价 × 流通股） |
-| `financials.spec.ts` | `@data` | 财报列序连续性、毛利率区间 [0,100]、EBITDA 与营业利润的业务约束 |
-| `comps.spec.ts` | `@data` | 可比公司表 + **跨表交叉校验**（Comps 表 AMD 行 == 财报表同口径）、**EV/市值非 $0** |
-| `valuation.spec.ts` | `@data` | P/S 反推营收 vs 季度表 TTM 交叉校验、PEG 口径、评级枚举合法 |
-| `risk.spec.ts` | `@data` | 风险表枚举值合法性（Neutral/Positive/Negative）、信号日期格式 |
-| `freshness.spec.ts` | `@data` | 不同数据源的合理更新周期（财报季度 vs 实时行情 vs 评级） |
-
-## 已发现的数据缺陷（用本套件可复现）
-
-- **Comps 表 EV / Market cap 全为 `$0.0`**：所有可比公司（INTC / NVDA / QCOM / TSM / ARM 等）的 EV 与 Market cap 列都显示 `$0.0`。`comps.spec.ts` 里「每家公司 EV / 市值非 $0」这条断言目前**会失败**，固化了这个真实 bug。
-
-## 运行
+Targets provided by the `Makefile`:
 
 ```bash
-make install      # 首次：装依赖 + Chromium
-make test         # 全量（直连 alva.ai，无需本地服务）
-make test-data    # 只跑数据正确性用例
-make test-ui      # 只跑外壳/交互用例
-make report       # 打开 HTML 报告
+make install     # first time: npm install + install Chromium
+make test        # run all tests (hits alva.ai directly, no local server needed)
+make test-smoke  # run only @smoke smoke cases
+make test-ui     # run in Playwright UI mode (visual — NOT "shell cases only")
+make test-headed # run in headed browser mode
+make debug       # run in debug mode
+make report      # open the HTML test report
+make codegen     # open the Playwright code generator
+make typecheck   # TypeScript type check
+make clean       # clean test-results / playwright-report
 ```
 
-或直接用 npm / 环境变量覆盖目标：
+`package.json` scripts (finer-grained; recommended to use npm directly):
+
+```bash
+npm test                  # all
+npm run test:data         # data-correctness cases only (--grep @data)
+npm run test:ui-only      # shell/interaction cases only (--grep @ui)
+npm run test:smoke        # @smoke smoke only
+npm run test:ui           # Playwright UI mode
+npm run test:headed       # headed mode
+npm run test:debug        # debug mode
+npm run report            # open HTML report
+npm run typecheck         # TS type check
+```
+
+Or override the target page with env vars:
 
 ```bash
 BASE_URL=https://alva.ai PLAYBOOK_PATH=/u/xxx/playbooks/yyy npm test
-npm run test:data     # 等价于 make test-data
 ```
 
-> 提示：线上站点慢且有偶发限流，完整套件建议 `npm test -- --workers=1` 串行跑更稳。
+> Tip: the live site is slow and has occasional rate limiting. For a full run, `npm test -- --workers=1` serial is more stable.
 
-## 纪律
+### Run evidence
 
-- 测试只读：不点击发送按钮、不登录、不写任何数据到对方站点。
-- 数值类断言分两类：
-  - **格式模式**（价格、涨跌幅、日期、views）→ 只验格式正则，不硬编码具体值（页面每 4 小时自动刷新）。
-  - **可计算交验**（回撤、市值、P/S 反推营收、跨表同口径）→ 用页面内其他字段现场算，不依赖外部真相源。
-- 新增用例前先跑探测脚本确认真实 DOM 与数据形态，不要凭截图猜选择器或硬编码会变的数值。
+```bash
+make install      # first time: install deps + Chromium
+make test         # full run (hits alva.ai directly, no local server)
+make report       # open the HTML report
+```
+
+- Full run logs are in [`PART1-onboarding.md`](./PART1-onboarding.md) (Appendix C): **97 passed + 1 failed** (the 1 failed is the `$0.0` real data defect described above), finishing in ~2.6~3.0 min.
+- This result was **independently re-verified twice** (re-run 5 hours apart, after a page-data snapshot refresh; `97 passed + 1 failed` was identical both times). That rules out the competing explanations "rate limiting / occasional load failure" and confirms a stable column-level fetch defect — see **Evidence C** in `PART1-onboarding.md` Appendix C.
+- The deliverable is this repo; the run evidence is the list-style test report in `PART1-onboarding.md` Appendix C (equivalent to CI logs).
+
+---
+
+## Page architecture under test (read before writing tests)
+
+The page is a **shell + iframe** two-layer structure — the starting point for all selectors:
+
+| Layer | Contents | Location method |
+|---|---|---|
+| Main document (alva.ai) | sidebar, title "AMD Deep-Dive", author, README badge, right-side Alva chat | directly `page.getByText(...)` |
+| `<iframe title="Dashboard">` | the real content dashboard (company card, 7 tabs, KPI, financials, comps, risk, ratings, charts); src points to `lake.playbook.alva.ai` with a version path (e.g. `v1.13.28`) | `dashboard(page)` helper (`page.frameLocator`) |
+
+Two traps (especially deadly for data tests):
+
+1. **Data fills in progressively**: the iframe skeleton renders first (placeholder `—` / `Loading…`), and metric labels and numbers may not be inserted into the DOM for 20~40s. Data assertions must wait explicitly (helper `DATA_TIMEOUT = 60s`); never assume elements are immediately visible.
+2. **Content loading is occasionally unstable + rate-limited**: the site shows signs of rate limiting high-frequency access (after a dozen consecutive runs the API intermittently returns 200 but empty data). Hence in config `fullyParallel: false`, `workers` dropped to 1~2, and each spec uses `beforeAll` to **load the page only once and share one page**, avoiding N cases × independent loads hammering the site.
+
+Two more site realities (hard-coded as comments in the tests):
+
+- The whole site has **no semantic h1~h6 headings** (the title is `<span class="page-header-title">`). The company name is inside the iframe and its text is `Advanced Micro Devices\n AMD · NASDAQ` (h1 embeds a span) — `exact: true` will never match; you must use `role=heading` or substring matching.
+- When not logged in, the console shows expected 401/403 (account APIs) and noise from blocked analytics scripts; `meta.spec.ts` only asserts no **uncaught** JS exceptions.
+
+## Data extraction approach (key design)
+
+Data testing is not "eyeball whether the numbers look right" — it is **extracting data into a structured object in the browser, then asserting with pure functions**:
+
+```
+tests/helpers/extract.ts   → in-browser extractor (page.evaluate),
+                             pulling KPI / financials / comps / ratings / risk / timestamps
+                             into a DashboardData structure
+tests/helpers/parse.ts     → pure functions: parseMoney / parsePct / parseDate / findDirtyValues
+tests/helpers/common.ts    → gotoPlaybook / dashboard / waitForDataReady / shared-page mechanism
+```
+
+Why this design:
+
+- Much of the page's data is in the DOM but **not visible** (e.g. `textContent` can get Annual financials / Risk tables, but `innerText` stops at Price performance) — data tests must use `textContent` / `getAttribute`, not trust visibility alone.
+- Separating "fetch" from "validate" lets assertions get very dense: cross-checks, range checks, enum validity, and sign consistency are all pure logic — fast to run, clear error messages.
+
+## Test files
+
+| File | Tag | Coverage |
+|---|---|---|
+| `smoke.spec.ts` | `@smoke` | page reachable + iframe content eventually renders |
+| `shell.spec.ts` | `@ui` | shell: title, author, badge, description, sidebar nav |
+| `tabs.spec.ts` | `@ui` | 7-tab bar + sub-tab count consistency (tabs are scroll anchors; data is in the DOM at once) |
+| `chat.spec.ts` | `@ui` | chat: welcome message, suggestion cards, input is typeable (**does not send**) |
+| `meta.spec.ts` | `@ui` | iframe src, meta description, no JS exceptions, a11y现状 |
+| `data-integrity.spec.ts` | `@data` | **global dirty-value scan**, structure completeness, revenue-share legend sums to 100%, empty-table check |
+| `market-data.spec.ts` | `@data` | quote KPI + **computable cross-checks** (52w drawdown = f(price, high); market cap = price × shares out) |
+| `financials.spec.ts` | `@data` | financials column-order continuity, gross-margin range [0,100], EBITDA vs operating-profit business constraint |
+| `comps.spec.ts` | `@data` | comps table + **cross-table check** (comps AMD row == financials same口径), **EV/market-cap ≠ $0** |
+| `valuation.spec.ts` | `@data` | P/S back-solved revenue vs quarterly TTM cross-check, PEG口径, rating enum valid |
+| `risk.spec.ts` | `@data` | risk-table enum validity (Neutral/Positive/Negative), signal date format |
+| `freshness.spec.ts` | `@data` | reasonable refresh cadence per data source (quarterly financials vs real-time quote vs ratings) |
+| `markets.spec.ts` | `@markets` | markets stock-page deep-link highlight, price ≠ $0.0, Alva Agent companion area, resource route 200, F-8 bad-param fallback ×2 |
+
+## Known data defects (reproducible with this suite)
+
+- **Comps table EV / Market cap all `$0.0`**: every comp company (INTC / NVDA / QCOM / TSM / ARM, etc.) shows `$0.0` for EV and Market cap. The assertion "each company's EV / market cap ≠ $0" in `comps.spec.ts` currently **fails**, pinning this real bug.
+
+## Discipline
+
+- Tests are read-only: no clicking send, no login, no writing any data to the target site.
+- Numeric assertions fall into two kinds:
+  - **Format patterns** (price, change %, date, views) → only validate the format regex, never hard-code concrete values (page auto-refreshes every 4 hours).
+  - **Computable cross-checks** (drawdown, market cap, P/S back-solved revenue, cross-table same口径) → compute on the fly from other fields on the page; don't depend on an external truth source.
+- Before adding a case, run a probe script to confirm the real DOM and data shape; don't guess selectors from screenshots or hard-code values that will change.
+
+---
+
+## Docs index
+
+- [`README.zh.md`](./README.zh.md) — Chinese version of this document.
+- [`PART1-onboarding.md`](./PART1-onboarding.md) — Part 1 login-journey exploratory report (F-1~F-9; logged-in cases: 8 SSO-required + markets UI merged into `tests/`) + run evidence (Appendix C: 97 passed + 1 failed, including the re-verification).
+- [`tests/`](./tests) — Part 2 data-correctness suite (13 specs: 7 `@data` + 4 `@ui` + 1 `@markets` + 1 `@smoke`, plus helpers extraction layer).

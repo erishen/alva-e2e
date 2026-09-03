@@ -1,0 +1,53 @@
+name: E2E (Playwright)
+
+# 让「可进 CI」的声明落地：本套件直连线上公开 playbook 页做只读数据正确性巡检。
+# - push / PR / 手动触发：跑 @smoke + @ui（快、稳，证明 CI 接线正确，全绿）
+# - 每日定时：跑 @data 生产环境数据巡逻（数据对时效敏感；已知 $0.0 缺陷会使其变红，属预期告警，见 PART2 §2 D-1）
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Run smoke + UI (push / PR / manual)
+        if: github.event_name != 'schedule'
+        run: npx playwright test --workers=1 --grep '@smoke|@ui'
+
+      - name: Run data-correctness patrol (daily)
+        if: github.event_name == 'schedule'
+        run: npx playwright test --workers=1 --grep '@data'
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
