@@ -99,6 +99,8 @@ Or override the target page with env vars:
 BASE_URL=https://alva.ai PLAYBOOK_PATH=/u/xxx/playbooks/yyy npm test
 ```
 
+> Configuration is also read from a local `.env` file (see [`.env.example`](./.env.example) for the full list). `playwright.config.ts` loads it via `dotenv`, so you can `cp .env.example .env` instead of prefixing every command with env vars.
+
 > Tip: the live site is slow and has occasional rate limiting. For a full run, `npm test -- --workers=1` serial is more stable.
 
 ### Run evidence

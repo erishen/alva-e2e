@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { defineConfig, devices } from '@playwright/test';
 
 /**
@@ -5,7 +6,7 @@ import { defineConfig, devices } from '@playwright/test';
  * 因此这里不配置 webServer —— 没有需要拉起的 SUT，
  * 所有测试直连 https://alva.ai。
  *
- * 环境变量：
+ * 环境变量（从 .env 自动加载，见 .env.example；也可用命令行前缀覆盖）：
  *   BASE_URL    覆盖被测地址，默认 https://alva.ai
  *   PLAYBOOK_PATH 覆盖 playbook 路径，默认 /u/lake/playbooks/amd-deep-dive
  */
