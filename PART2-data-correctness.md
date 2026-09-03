@@ -4,7 +4,7 @@
 >
 > **执行方式**：读-only 探针（Playwright 直连线上 `https://alva.ai`，不修改任何数据）+ 跨表交叉校验 + 异常值守卫；所有用例可进 CI（无需 SSO）。
 >
-> **状态**：初稿。缺陷登记表（§2）与覆盖矩阵（§3）已定稿；运行证据（§5）需在本机对线上站点实跑生成，见该节说明。
+> **状态**：定稿。缺陷登记表（§2）、覆盖矩阵（§3）已定稿；运行证据（§5.2）已补 2026-09-03 本机全量实跑记录（修复前 106 passed / 2 failed / 1 flaky）。
 >
 > **边界声明**：被测对象是线上公开页面，**不重放登录、不写数据**。除 `markets.spec.ts`（公开个股页）外，其余 spec 均围绕同一个公开 playbook 页做只读断言；`part1/` 下的 SSO 登录态套件不在此列（见 PART1 报告「仓库范围」）。
 >
@@ -17,7 +17,7 @@
 | 项 | 结论 |
 |---|---|
 | 测试范围 | 公开 playbook 页的数据正确性：估值/财报/行情/可比公司/风险/新鲜度/数据完整性 + 页面外壳与 Tab 导航 |
-| 用例规模 | 13 个 spec 文件、91 条用例声明（参数化展开后实际执行约 98，即 97 passed + 1 failed，见 §5 / PART1 附录 C；`@data` 7 / `@ui` 4 / `@markets` 1 / `@smoke` 1；tabs、markets 含参数化展开） |
+| 用例规模 | 13 个 spec 文件、91 条用例声明（`@data` 7 / `@ui` 4 / `@markets` 1 / `@smoke` 1；tabs、markets 含参数化展开）。参数化展开后实际执行数见 §5.2 最新实跑（修复前本机全量：**106 passed / 2 failed / 1 flaky**） |
 | 活跃功能缺陷（P0/P1） | **1 条确认**：D-1 可比公司表 EV 与 Market cap 全部渲染为 `$0.0`（取数缺陷，P1） |
 | 防护性守卫 | 6 类跨表/异常/新鲜度回归守卫（D-2 ~ D-6 及完整性类），覆盖金额量纲、交叉校验、NaN 渲染、信号管道、时间新鲜度、Tab 命名 |
 | 核心叙事 | 数据正确性类问题**适合自动化**：金额量纲、跨表勾稽、异常值、新鲜度阈值均可机检；但「$0.0 是取数 bug 还是真实为零」「某阈值该取多少」仍需人判定口径 |
@@ -86,7 +86,7 @@
 | `freshness.spec.ts` | 数据新鲜度 | `@data` | 6 | 快照≤2 天、股价≤7 天、财报≤120 天、评级≤7 天、时间戳可解析、已报告期间<今天 |
 | `markets.spec.ts` | markets 个股页 | `@markets` | 5 | 深链高亮（默认 tab 仅 `aria-selected` 属性存在时校验，避免过度断言）、价格≠$0.0、Alva Agent 伴侣区、资源路由 200、F-8 错参回退 ×2 |
 
-> *用例数为 `test(...)` 声明数；`tabs.spec.ts`、`markets.spec.ts` 含参数化展开，实际执行更多。合计 **91 条声明**（参数化展开后实际执行约 98，即 97 passed + 1 failed，见 §5 / PART1 附录 C）。`npm run test:data`（`--grep @data`）覆盖 7 个 `@data` spec；`npm run test:ui-only` 覆盖 4 个 `@ui` spec。
+> *用例数为 `test(...)` 声明数；`tabs.spec.ts`、`markets.spec.ts` 含参数化展开，实际执行更多。合计 **91 条声明**。参数化展开后的实际执行数见 §5.2 最新实跑（修复前本机全量 106 passed / 2 failed / 1 flaky）。`npm run test:data`（`--grep @data`）覆盖 7 个 `@data` spec；`npm run test:ui-only` 覆盖 4 个 `@ui` spec。
 
 ---
 
@@ -129,6 +129,16 @@ npm run report        # 或 make report
 - **本报告的缺陷登记表与覆盖矩阵基于用例设计定稿；实时通过/失败数字需在本机对线上站点实跑生成**（`playwright-report/index.html`）。沙箱环境无法直连 `alva.ai`（出口代理拦截 + 客户端渲染限流），故未在此嵌入一次新跑的计数。
 - **D-1（$0.0 EV/MC）被设计为活跃失败守卫**：在缺陷修复前，该用例在报告中保持红色——这是预期状态，代表「数据回归正在盯住这个 bug」，不是套件不稳定。
 - 运行产物 `playwright-report/`、`test-results/` 已被 `.gitignore` 忽略，不随仓库提交。
+
+### 5.2.1 最新本机全量实跑（2026-09-03，commit 4863cb4 之前）
+
+- 命令：`npm test`（chromium 单端，本地 `.env` 默认 `BASE_URL=https://alva.ai` / `PLAYBOOK_PATH=/u/lake/playbooks/amd-deep-dive`）
+- 结果：**106 passed / 2 failed / 1 flaky**（约 5.2 min）
+- 分解：
+  - `comps.spec.ts` EV/MC `$0.0` 守卫 = **1 failed（设计内）**：即 D-1，缺陷修复前保持红色，代表数据回归正盯住该 bug。
+  - `markets.spec.ts` 深链默认 tab 过度断言 = **1 failed（已校准）**：仅默认 Overview tab 强求 `aria-selected='true'`，而 SPA 对默认选中项不显式翻转该属性；已于 commit `4863cb4` 改为「仅属性存在时校验」，预期复跑变绿。
+  - `chat.spec.ts` 欢迎语 = **1 flaky**：站点慢加载偶发，重试通过；已把局部超时提到 45s，CI `retries:2` 仍兜底。
+- 校准后预期：复跑约 **107 passed / 1 failed**（唯一红为设计内 D-1）。
 
 ### 5.3 CI 建议
 - `@data` 层每日定时跑（数据正确性对时效敏感）；`@ui` 层随页面变更跑；`@smoke` 层每次部署后跑。

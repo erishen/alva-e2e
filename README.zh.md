@@ -19,10 +19,10 @@ https://alva.ai/u/lake/playbooks/amd-deep-dive
 >
 > | 部分 | 交付物 | 内容 |
 > |---|---|---|
-> | **Part 2**（本 README 主体） | `tests/` 共 13 个 spec（7 个 `@data` + 4 个 `@ui` + 1 个 `@markets` + 1 个 `@smoke`，另有 `helpers/` 提取层） | 已发布公开 Playbook（AMD Deep-Dive）的**生产环境金融数据巡检**套件，**97 passed + 1 failed**（那 1 个红是真抓到的数据缺陷），对应 JD 核心职责「生产环境质量巡检……金融数据正确性」 |
+> | **Part 2**（本 README 主体） | `tests/` 共 13 个 spec（7 个 `@data` + 4 个 `@ui` + 1 个 `@markets` + 1 个 `@smoke`，另有 `helpers/` 提取层） | 已发布公开 Playbook（AMD Deep-Dive）的**生产环境金融数据巡检**套件，最新全量实跑 **106 passed / 2 failed / 1 flaky**（1 个 failed 为设计内 D-1 `$0.0` 守卫；另一个为 markets 过度断言，已校准——见 PART2 §5.2），对应 JD 核心职责「生产环境质量巡检……金融数据正确性」 |
 > | **Part 1** | [`PART1-onboarding.md`](./PART1-onboarding.md) | 登录链路「注册 → 建 Portfolio Watch Automation → 建 Playbook → 收 Alert」的**探索式测试报告**，9 条发现（F-1~F-9）+ 登录态用例全绿（onboarding/journey 共 8 条需 SSO；markets 个股页 UI 已并入 `tests/` 公开套件） |
 >
-> 运行证据见 [`PART1-onboarding.md`](./PART1-onboarding.md)（附录 C）。下面三节按笔试要求说明（以 Part 2 为主，因其为自动化交付主体）。
+> 运行证据：Part 2 全量实跑见 [`PART2-data-correctness.md`](./PART2-data-correctness.md) §5.2；Part 1 历史证据见 [`PART1-onboarding.md`](./PART1-onboarding.md) 附录 C。下面三节按笔试要求说明（以 Part 2 为主，因其为自动化交付主体）。
 
 ### 1. 为什么选「Playbook 数据正确性」这个场景（而不是另一个）
 
@@ -109,8 +109,8 @@ make test         # 全量（直连 alva.ai，无需本地服务）
 make report       # 打开 HTML 报告
 ```
 
-- 全量运行日志见 [`PART1-onboarding.md`](./PART1-onboarding.md)（附录 C）：**97 passed + 1 failed**（那 1 个 failed 即上文抓到的 `$0.0` 真实数据缺陷），约 2.6~3.0 分钟跑完。
-- 该结果**经过二次独立复验**（时隔 5 小时、页面数据快照刷新后重跑，`97 passed + 1 failed` 完全一致），据此排除「限流 / 偶发加载失败」的竞争性解释，判定为稳定的列级取数缺陷 —— 详见 `PART1-onboarding.md` **附录 C 证据 C**。
+- 当前仓库最新全量实跑证据见 [`PART2-data-correctness.md`](./PART2-data-correctness.md) §5.2——2026-09-03 本机实跑 **106 passed / 2 failed / 1 flaky**（1 个 failed 为设计内 D-1 `$0.0` 守卫；另一个为 markets 过度断言，已于 `4863cb4` 校准；1 个 flaky 为站点慢加载致聊天欢迎语偶发，重试通过）。校准后复跑预期约 107 passed / 1 failed。
+- Part 1 登录链路历史证据（97 passed + 1 failed，即 `$0.0` 缺陷）仍保留在 [`PART1-onboarding.md`](./PART1-onboarding.md) 附录 C；Part 1 的 SSO 用例已不在本仓库（`part1/` 被 gitignore），该日志仅作历史参考。
 - 提交物即本仓库；运行证据为 `PART1-onboarding.md` 附录 C 的列表式测试报告（等价 CI 日志）。
 
 ---

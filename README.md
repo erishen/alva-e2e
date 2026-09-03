@@ -19,10 +19,10 @@ https://alva.ai/u/lake/playbooks/amd-deep-dive
 >
 > | Part | Artifact | Contents |
 > |---|---|---|
-> | **Part 2** (the body of this README) | `tests/` — 13 specs (7 `@data` + 4 `@ui` + 1 `@markets` + 1 `@smoke`, plus a `helpers/` extraction layer) | A **production financial-data巡检 (patrol)** suite for the published public Playbook (AMD Deep-Dive): **97 passed + 1 failed** (the 1 red is a real data defect it caught), matching the JD's core responsibility "production-quality patrol … financial data correctness" |
+> | **Part 2** (the body of this README) | `tests/` — 13 specs (7 `@data` + 4 `@ui` + 1 `@markets` + 1 `@smoke`, plus a `helpers/` extraction layer) | A **production financial-data patrol** suite for the published public Playbook (AMD Deep-Dive). Latest full run: **106 passed / 2 failed / 1 flaky** (1 failed = designed D-1 `$0.0` guard; the other a markets over-assertion, since calibrated — see PART2 §5.2), matching the JD's core responsibility "production-quality patrol … financial data correctness" |
 > | **Part 1** | [`PART1-onboarding.md`](./PART1-onboarding.md) | An **exploratory testing report** of the login journey "sign up → create Portfolio Watch Automation → create Playbook → receive Alert": 9 findings (F-1~F-9) + logged-in test cases, all green (onboarding/journey: 8, SSO-required; the markets stock-page UI suite is merged into the public `tests/` suite) |
 >
-> Run evidence is in [`PART1-onboarding.md`](./PART1-onboarding.md) (Appendix C). The three sections below follow the take-home requirements (Part 2 first, since it is the automated deliverable).
+> Run evidence: Part 2 full-run is in [`PART2-data-correctness.md`](./PART2-data-correctness.md) §5.2; Part 1 historical evidence is in [`PART1-onboarding.md`](./PART1-onboarding.md) Appendix C. The three sections below follow the take-home requirements (Part 2 first, since it is the automated deliverable).
 
 ### 1. Why "Playbook data correctness" (and not another scenario)
 
@@ -111,8 +111,8 @@ make test         # full run (hits alva.ai directly, no local server)
 make report       # open the HTML report
 ```
 
-- Full run logs are in [`PART1-onboarding.md`](./PART1-onboarding.md) (Appendix C): **97 passed + 1 failed** (the 1 failed is the `$0.0` real data defect described above), finishing in ~2.6~3.0 min.
-- This result was **independently re-verified twice** (re-run 5 hours apart, after a page-data snapshot refresh; `97 passed + 1 failed` was identical both times). That rules out the competing explanations "rate limiting / occasional load failure" and confirms a stable column-level fetch defect — see **Evidence C** in `PART1-onboarding.md` Appendix C.
+- Latest full-run evidence for the current repo: see [`PART2-data-correctness.md`](./PART2-data-correctness.md) §5.2 — local full run 2026-09-03: **106 passed / 2 failed / 1 flaky** (1 failed = designed D-1 `$0.0` guard; the other a markets over-assertion, since calibrated at `4863cb4`; 1 flaky = chat welcome msg on slow live site, retried through). Calibrated re-run is expected ~107 passed / 1 failed.
+- Historical Part 1 login-journey evidence (97 passed + 1 failed, the `$0.0` defect) remains in [`PART1-onboarding.md`](./PART1-onboarding.md) Appendix C; Part 1's SSO cases are no longer in this repo (gitignored `part1/`), so that log is kept as historical reference only.
 - The deliverable is this repo; the run evidence is the list-style test report in `PART1-onboarding.md` Appendix C (equivalent to CI logs).
 
 ---
