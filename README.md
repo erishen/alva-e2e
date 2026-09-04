@@ -13,44 +13,25 @@ https://alva.ai/u/lake/playbooks/amd-deep-dive
 
 ---
 
-## Submission notes (Alva · AI-Native QA take-home)
+## What's inside
 
-> This repo delivers **both parts** of the take-home. Suggested reading order:
->
-> | Part | Artifact | Contents |
-> |---|---|---|
-> | **Part 2** (the body of this README) | `tests/` — 13 specs (7 `@data` + 4 `@ui` + 1 `@markets` + 1 `@smoke`, plus a `helpers/` extraction layer) | A **production financial-data patrol** suite for the published public Playbook (AMD Deep-Dive). Latest full run: **107 passed / 1 failed / 1 flaky** (1 failed = designed D-1 `$0.0` guard; the flaky = valuation TTM label, root-caused and fixed since — see docs/PART2 §5.2), matching the JD's core responsibility "production-quality patrol … financial data correctness" |
-> | **Part 1** | [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) | An **exploratory testing report** of the login journey "sign up → create Portfolio Watch Automation → create Playbook → receive Alert": 9 findings (F-1~F-9) + logged-in test cases, all green (onboarding/journey: 8, SSO-required; the markets stock-page UI suite is merged into the public `tests/` suite) |
->
-> Run evidence: Part 2 full-run is in [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) §5.2; Part 1 historical evidence is in [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) Appendix C. The three sections below follow the take-home requirements (Part 2 first, since it is the automated deliverable).
+The suite patrols **financial data correctness** — not UI styling: are computed numbers right, do cross-table figures agree, are there dirty values / leftover placeholders, is the data fresh. Public playbook pages can be patrolled unattended on CI, and cross-checking the same metric across the financials table, comps table, and quote KPI catches fetch/consistency failures that no single side reveals on its own. This suite caught one for real: every company's EV and Market cap in the comps table renders as `$0.0` (see defect D-1 in docs/PART2).
 
-### 1. Why "Playbook data correctness" (and not another scenario)
+| Artifact | Contents |
+|---|---|
+| [`tests/`](./tests) — 13 specs (7 `@data` + 4 `@ui` + 1 `@markets` + 1 `@smoke`, plus a `helpers/` extraction layer) | Production data-correctness patrol for the published AMD Deep-Dive playbook. Latest full run: **107 passed / 1 failed / 1 flaky** — the 1 failed is the by-design D-1 `$0.0` guard; the flaky (valuation TTM label) was root-caused and fixed since (see [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) §5.2). |
+| [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) | Full data-correctness report: defect register (D-1 confirmed `$0.0` + guards D-2~D-6), coverage matrix, run evidence with fix history. |
+| [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) | Exploratory report of the login journey (sign up → create automation → create playbook → receive alert): 9 findings (F-1~F-9) + logged-in test evidence (Appendix C). |
+| [`evidence/`](./evidence) | Auto-captured defect screenshots (red-highlighted `$0.0` columns) committed with the repo. |
 
-The Part 1 journey is "sign up → create Portfolio Watch Automation → **create Playbook** → receive Alert", all behind auth. **The Playbook is the third step of that journey**, so testing "the data correctness of a published public Playbook (AMD Deep-Dive)" sits squarely inside the take-home's "pick any one Part 1 scenario" scope. I deliberately **did not** put the automation on the login journey itself, for these reasons:
+A complementary logged-in suite (onboarding/journey, requires SSO) runs locally only and is intentionally not committed to this repo; its exploration and findings live in [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md).
 
-- **Data bugs are the deepest bugs.** A reversed gain/loss sign, or a market cap off by one order of magnitude, is real money lost for an investing user — far worse than ten UI alignment nits. The JD singles out "financial data correctness" as a core responsibility precisely because of this.
-- **Public pages can be patrolled unattended.** The login journey needs a real account + anti-bot + rate limiting on every run, so it doesn't suit routine regression. A public Playbook can run on a CI timer and genuinely serve as "production patrol".
-- **It enables convincing cross-checks.** The same metric (AMD revenue, EBITDA, share price) appears once each in the financials table, the comps table, and the quote KPI — and they must all agree. Assertions like these catch real failures (inconsistent fetch口径 / unit-conversion errors / cache cross-wiring) that **no single side would reveal on its own**. This suite did catch one: in `comps.spec.ts`, the assertion "EV / Market cap should be real values" is **currently red**, because every company's EV and Market cap in the comps table render as `$0.0` (data not fetched, not actually zero).
-- The login journey (Part 1) is not discarded — it is covered by a **complementary standalone logged-in suite** (requires auth, hence separated from this suite and not committed to this repo): 19 tests across onboarding / journey / markets specs, **all green**; the exploration and 9 findings are in [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md). Its markets spec is the **bridge between Part 1 and Part 2**: the markets stock page is both the alert landing page and the quote-data outlet, and its assertion "price looks like `$X.XX` and is non-zero" directly contrasts with Part 2's `$0.0` defect.
+## Known limitations
 
-### 2. What the AI did in the workflow, and what I overrode / corrected
-
-Almost all of this project's code was generated in conversation by an AI coding agent (WorkBuddy); I (the candidate) set direction, reviewed assertions, and corrected course. Key moments:
-
-- **The agent first followed an old project template and focused on UI / multi-device styling** (tab switching, responsive viewports). I explicitly stopped it: "the point is testing data, not multi-device styling." The agent then flipped the whole focus to data correctness and dropped the mobile project.
-- **The agent matched company names with `getByText(..., { exact: true })` and got wiped out inside the iframe** (the company name textContent is `Advanced Micro Devices\n AMD · NASDAQ`, so exact matching never hits). I had it switch to `role=heading` / substring matching and fixed every related assertion accordingly.
-- **The agent's `first()` hit a hidden intro sentence** (in the Thesis panel, `first()` matched the hidden "…the AMD bull case…" instead of the visible heading). I had it add `filter({ visible: true })` to fix it.
-- **The agent over-asserted one business assumption** ("EBITDA ≤ gross profit"). I pointed out that for foundries (e.g. TSM) depreciation hits COGS and lowers gross profit, so EBITDA rebounding above gross profit after add-back is normal accounting — the agent then tightened the hard bound to "EBITDA ≤ revenue".
-- **The agent wrote the welcome-message regex with a straight apostrophe `'`**, while the site uses a curly apostrophe `’` (U+2019). I had it switch to an apostrophe-free feature phrase.
-- **Dirty-value scan false positive** (an English word somewhere in the full text contains the substring `null`). I had it narrow the scan from "whole-page innerText" to "data cells" to kill the false positive.
-- **I set the "load once, assert many" shared-page mechanism as the target**: the agent initially loaded the slow iframe independently per case — a full run took 38 min and tripped rate limits; after switching to a single shared page in `beforeAll`, the full run dropped to ~2.5 min with 97 cases passing.
-
-### 3. Even all-green, what I still don't trust (what's not covered)
-
-- **Only one Playbook, one point in time.** This is a snapshot of a single AMD ticker. Other Playbooks (different sectors / data densities) may expose different rendering or fetch problems; and the page refreshes roughly every 4 hours, so I can't guarantee the structure stays put after each refresh.
-- **Cross-checks are "internal consistency", not "against external truth".** Market cap ÷ P/S back-solving revenue, comps table vs financials table same口径 — all only self-verify **within** the page. If Alva's backend were wrong on **all** data sources at once (e.g. FX rate, unit base), the suite would go all green yet still be wrong. Truly guarding against that needs an external ground-truth (e.g. SEC / quote API) for three-way comparison; this suite doesn't do that.
+- **Only one playbook, one point in time.** This is a snapshot of a single AMD ticker. Other playbooks (different sectors / data densities) may expose different rendering or fetch problems; and the page refreshes roughly every 4 hours, so structure drift cannot be ruled out.
+- **Cross-checks are "internal consistency", not "against external truth".** Market cap ÷ P/S back-solving revenue, comps table vs financials table same caliber — all only self-verify **within** the page. If the backend were wrong on **all** data sources at once (e.g. FX rate, unit base), the suite would go all green yet still be wrong. Truly guarding against that needs an external ground-truth (e.g. SEC / quote API) for three-way comparison; this suite doesn't do that.
 - **Rate limiting makes the run itself unstable.** The site clearly rate-limits high-frequency access (after a dozen consecutive runs the API intermittently returns empty data). `pnpm test` can occasionally fail just from not loading data, needing `--workers=1` serial retries. That means CI must tolerate flaky failures, or add warm-up / back-off, or it'll produce false reds.
-- **This suite (Part 2) deliberately does not cover the auth state — a design trade-off, complemented by Part 1, but end-to-end is still weak.** Sign-up, Automation creation, and Alert config/push are excluded from this suite because they need a real account (only public pages can be patrolled unattended). Part 1's logged-in cases (onboarding/journey: 8) add **skeleton-level** coverage of the login chain (route reachable, empty-state guidance, deep-link targeting, non-zero quote), but two things I couldn't automate: ① **the automation is an async LLM workflow** (builds over minutes) — I can only assert "the instruction entered the conversation", not "the final generated automation spec is correct"; ② **real alert triggering can't be verified** — it requires AMD to actually fall from $457 through $100, an uncontrolled wait. Both currently rely on manual walkthrough and are flagged explicitly in `docs/PART1-onboarding.md` §6.
+- **The auth state is deliberately out of scope — a design trade-off that keeps the patrol unattended.** Sign-up, automation creation, and alert config/push are excluded because they need a real account (only public pages can be patrolled unattended). The complementary logged-in suite adds **skeleton-level** coverage of the login chain (route reachable, empty-state guidance, deep-link targeting, non-zero quote), but two things can't be automated: ① **the automation is an async LLM workflow** (builds over minutes) — one can only assert "the instruction entered the conversation", not "the final generated automation spec is correct"; ② **real alert triggering can't be verified** — it requires AMD to actually fall from $457 through $100, an uncontrolled wait. Both rely on manual walkthrough and are flagged explicitly in [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) §6.
 - **The `$0.0` red case is a "known-defect tracker", not a "new-bug detector".** It only asserts EV/market-cap ≠ 0. Once the defect is fixed this case goes green; but it won't proactively catch more subtle errors like "EV computed to a wrong number" (that needs value-level checks, beyond current scope).
 
 ---
@@ -116,8 +97,8 @@ make report       # open the HTML report
 ```
 
 - Latest full-run evidence for the current repo: see [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) §5.2 — local full runs 2026-09-03: first **106 passed / 2 failed / 1 flaky** (markets over-assertion, calibrated at `4863cb4`), then **107 passed / 1 failed / 1 flaky** (1 failed = designed D-1 `$0.0` guard; the flaky = valuation TTM label populated last, root-caused and fixed at `84e6477` by gating the snapshot on it). Calibrated expectation: ~**108 passed / 1 failed (D-1) / 0 flaky**.
-- Historical Part 1 login-journey evidence (97 passed + 1 failed, the `$0.0` defect) remains in [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) Appendix C; Part 1's SSO cases are no longer in this repo (gitignored `part1/`), so that log is kept as historical reference only.
-- The deliverable is this repo; the run evidence is the list-style test report in `docs/PART1-onboarding.md` Appendix C (equivalent to CI logs).
+- Historical login-journey evidence from the exploratory phase (97 passed + 1 failed, the `$0.0` defect) remains in [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) Appendix C; the SSO-required cases run locally only (gitignored `part1/`), so that log is kept as historical reference only.
+- The full-suite run evidence is the list-style test report in `docs/PART1-onboarding.md` Appendix C (equivalent to CI logs).
 
 ---
 
@@ -192,5 +173,5 @@ Why this design:
 ## Docs index
 
 - [`README.zh.md`](./README.zh.md) — Chinese version of this document.
-- [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) — Part 1 login-journey exploratory report (F-1~F-9; logged-in cases: 8 SSO-required + markets UI merged into `tests/`) + run evidence (Appendix C: 97 passed + 1 failed, including the re-verification).
-- [`tests/`](./tests) — Part 2 data-correctness suite (13 specs: 7 `@data` + 4 `@ui` + 1 `@markets` + 1 `@smoke`, plus helpers extraction layer).
+- [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) — login-journey exploratory report (F-1~F-9; logged-in cases: 8 SSO-required + markets UI merged into `tests/`) + run evidence (Appendix C: 97 passed + 1 failed, including the re-verification).
+- [`tests/`](./tests) — data-correctness suite (13 specs: 7 `@data` + 4 `@ui` + 1 `@markets` + 1 `@smoke`, plus helpers extraction layer).

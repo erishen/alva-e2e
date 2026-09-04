@@ -13,44 +13,25 @@ https://alva.ai/u/lake/playbooks/amd-deep-dive
 
 ---
 
-## 应聘提交说明（Alva · AI-Native QA 笔试）
+## 仓库内容
 
-> 本仓库交付笔试的**两部分**，建议按此顺序阅读：
->
-> | 部分 | 交付物 | 内容 |
-> |---|---|---|
-> | **Part 2**（本 README 主体） | `tests/` 共 13 个 spec（7 个 `@data` + 4 个 `@ui` + 1 个 `@markets` + 1 个 `@smoke`，另有 `helpers/` 提取层） | 已发布公开 Playbook（AMD Deep-Dive）的**生产环境金融数据巡检**套件，最新全量实跑 **107 passed / 1 failed / 1 flaky**（1 个 failed 为设计内 D-1 `$0.0` 守卫；flaky 为估值 TTM 口径文案，已定位根因并修复——见 docs/PART2 §5.2），对应 JD 核心职责「生产环境质量巡检……金融数据正确性」 |
-> | **Part 1** | [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) | 登录链路「注册 → 建 Portfolio Watch Automation → 建 Playbook → 收 Alert」的**探索式测试报告**，9 条发现（F-1~F-9）+ 登录态用例全绿（onboarding/journey 共 8 条需 SSO；markets 个股页 UI 已并入 `tests/` 公开套件） |
->
-> 运行证据：Part 2 全量实跑见 [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) §5.2；Part 1 历史证据见 [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) 附录 C。下面三节按笔试要求说明（以 Part 2 为主，因其为自动化交付主体）。
+本套件巡检的是**金融数据正确性**——而非 UI 样式：数字有没有算错、跨表口径是否一致、有没有脏值 / 占位符残留、更新是否新鲜。公开 Playbook 页面可以无人值守地在 CI 里定时巡检；把同一个指标放在「财报表」「可比公司表」「行情 KPI」三处交叉校验，能抓出**单看任一边都发现不了**的取数 / 一致性故障。本套件确实抓到一个：可比公司表里所有公司的 EV 与 Market cap 都渲染成了 `$0.0`（见 docs/PART2 缺陷 D-1）。
 
-### 1. 为什么选「Playbook 数据正确性」这个场景（而不是另一个）
+| 交付物 | 内容 |
+|---|---|
+| [`tests/`](./tests) — 共 13 个 spec（7 个 `@data` + 4 个 `@ui` + 1 个 `@markets` + 1 个 `@smoke`，另有 `helpers/` 提取层） | 已发布 AMD Deep-Dive Playbook 的**生产环境数据巡检**套件。最新全量实跑 **107 passed / 1 failed / 1 flaky**——failed 为设计内 D-1 `$0.0` 守卫；flaky（估值 TTM 口径文案）已定位根因并修复（见 [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) §5.2）。 |
+| [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) | 数据正确性完整报告：缺陷登记表（D-1 确认缺陷 + D-2~D-6 防护守卫）、覆盖矩阵、含修复史的运行证据。 |
+| [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) | 登录链路（注册 → 建 Automation → 建 Playbook → 收 Alert）**探索式测试报告**：9 条发现（F-1~F-9）+ 登录态用例证据（附录 C）。 |
+| [`evidence/`](./evidence) | 随仓库提交的缺陷自动截图（红框高亮的 `$0.0` 列）。 |
 
-笔试 Part 1 的旅程是「注册 → 建 Portfolio Watch Automation → **建 Playbook** → 收 Alert」，全部在登录态下。**Playbook 正是这条旅程的第三环**，因此本套件测试的「已发布公开 Playbook（AMD Deep-Dive）的数据正确性」落在题目「任选 Part 1 一场景」的范围内。我刻意**没有**把自动化测试放在登录链路本身，理由：
+另有互补的登录态套件（onboarding/journey，需 SSO）仅本机运行、刻意不入库；其探索过程与发现见 [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md)。
 
-- **数据 bug 是最深的 bug。** 一条涨跌幅符号反向、一个市值数量级错一位，对投资用户是实打实的亏损，比十条 UI 对齐问题都严重。JD 把「金融数据正确性」单列为核心职责，正是这个判断。
-- **公开页面可无人值守巡检。** 登录链路每次跑都要真实账号 + 反爬 + 限流，不适合做常态化回归；而公开 Playbook 能在 CI 里定时跑，真正起到「生产环境巡检」作用。
-- **它能做出有说服力的交叉校验。** 同一个指标（AMD 营收、EBITDA、股价）在「财报表」「可比公司表」「行情 KPI」三处各出现一次，互相必须相等——这类断言能抓出取数口径不一致、单位换算错、缓存串号等**单看任一边都发现不了**的真实故障。本套件确实抓到了一个：`comps.spec.ts` 里「EV / Market cap 应有真实数值」这条用例**当前是红色的**，因为可比表里所有公司的 EV 与 Market cap 都渲染成了 `$0.0`（数据没取到，并非真实为零）。
-- 登录链路（Part 1 旅程）我没有丢弃，而是作为**互补的独立套件**——需登录态，故独立于本套件、仅本机运行、未纳入本仓库：登录链路 8 条用例（onboarding / journey，需 SSO）**全绿**；探索结论与 9 条发现见 [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md)。其中 markets 个股页套件是 **Part 1 ↔ Part 2 的衔接区**：markets 个股页既是 alert 的落地页、又是行情数据的出口，其「价格形如 `$X.XX` 且非零」断言正好与 Part 2 的 `$0.0` 缺陷形成对照。
+## 已知局限
 
-### 2. AI 在工作流里做了什么，我又否决 / 修改了什么
-
-本项目的代码几乎全部由一个 AI 编码 Agent（WorkBuddy）在对话中生成，我（应聘者）负责**定方向、审断言、纠偏**。几个关键节点：
-
-- **Agent 最初按旧项目模板，把重点放在 UI / 多端样式**（Tab 切换、响应式视口）。我明确叫停：「重点是测数据，不是多端样式」，Agent 据此把整套重心翻转为数据正确性，并删掉了 mobile project。
-- **Agent 用 `getByText(..., { exact: true })` 匹配公司名，在 iframe 里全军覆没**（公司名 textContent 是 `Advanced Micro Devices\n AMD · NASDAQ`，精确匹配永远不中）。我让它改为基于 `role=heading` / 包含匹配，并据此修好了所有相关断言。
-- **Agent 写了 `first()` 命中隐藏引导句**的坑（Thesis 面板里 `first()` 先命中了隐藏的 "…the AMD bull case…" 而非可见标题）。我让它加 `filter({ visible: true })` 修正。
-- **Agent 一条业务假设过度**（断言「EBITDA ≤ 毛利」）。我指出晶圆代工厂（如 TSM）折旧计入营业成本会压低毛利、加回折旧后 EBITDA 反超属正常会计表现——Agent 据此把硬边界收敛为「EBITDA ≤ 营收」。
-- **Agent 把欢迎语正则写成直撇号 `'`**，而站点用的是弯撇号 `’`（U+2019）。我让它改用无撇号的特征短语。
-- **脏值扫描误报**（全文本里某英文单词含 `null` 子串）。我让它把扫描范围从「整页 innerText」收窄到「数据单元格」，消除误报。
-- **我把「1 次加载、多次断言」的共享 page 机制定为目标**：Agent 最初每个用例独立加载慢速 iframe，全量跑 38 分钟且限流翻车；改成 `beforeAll` 共享一页后，全量降到 2.5 分钟、97 条用例通过。
-
-### 3. 即使全绿，我仍然不放心的地方（没覆盖什么）
-
-- **只覆盖一个 Playbook、一个时间点。** 这是 AMD 单一标的的快照。其他 Playbook（不同行业 / 不同数据密度）可能暴露不同的渲染或取数问题；且页面每约 4 小时刷新，我无法保证每次刷新后结构不变。
-- **交叉校验是「内部一致性」，不是「对外部真相」。** 市值 ÷ P/S 反推营收、Comps 表 vs 财报表同口径——这些都只在页面**内部**互验。如果 Alva 后端**所有数据源同时错了**（如汇率、单位基准），套件会全绿却仍是错的。要真正防住，需要引入一个外部 ground-truth（如 SEC/行情 API）做三方比对，本套件未做。
-- **限流让运行本身不稳定。** 站点对高频访问有明显限流（连续跑十几趟后 API 间歇返回空数据）。`pnpm test` 偶尔会因加载不出数据而失败，需要 `--workers=1` 串行重试。这意味着 CI 必须容忍偶发失败、或加预热/退避，否则会出假红。
-- **本套件（Part 2）不覆盖登录态——这是刻意的设计取舍，已由 Part 1 互补，但端到端仍是弱项。** 注册、Automation 创建、Alert 配置与推送因需真实账号而排除在本套件外（公开页面才能无人值守巡检）。Part 1 的登录态用例（onboarding/journey 共 8 条）补上了登录链路的**骨架级**覆盖（路由可达、空状态引导、深链定位、行情非零），但仍有两处我自动化不了：① **automation 是异步 LLM 工作流**（构建数分钟），我只能断言「指令进入对话」，无法断言「最终生成的 automation spec 正确」；② **alert 真实触发无法验证**——它要求 AMD 从 $457 实际跌破 $100，等待期不可控。这两处目前依赖人工走查，已在 `docs/PART1-onboarding.md` §6 明确标注。
+- **只覆盖一个 Playbook、一个时间点。** 这是 AMD 单一标的的快照。其他 Playbook（不同行业 / 不同数据密度）可能暴露不同的渲染或取数问题；且页面每约 4 小时刷新，结构漂移无法完全排除。
+- **交叉校验是「内部一致性」，不是「对外部真相」。** 市值 ÷ P/S 反推营收、Comps 表 vs 财报表同口径——这些都只在页面**内部**互验。如果后端**所有数据源同时错了**（如汇率、单位基准），套件会全绿却仍是错的。要真正防住，需要引入外部 ground-truth（如 SEC / 行情 API）做三方比对，本套件未做。
+- **限流让运行本身不稳定。** 站点对高频访问有明显限流（连续跑十几趟后 API 间歇返回空数据）。`pnpm test` 偶尔会因加载不出数据而失败，需要 `--workers=1` 串行重试。这意味着 CI 必须容忍偶发失败、或加预热 / 退避，否则会出假红。
+- **登录态刻意不在巡检范围——这是保证无人值守的设计取舍。** 注册、Automation 创建、Alert 配置与推送因需真实账号而排除在外（公开页面才能无人值守巡检）。互补的登录态套件补上了登录链路的**骨架级**覆盖（路由可达、空状态引导、深链定位、行情非零），但仍有两处无法自动化：① **automation 是异步 LLM 工作流**（构建数分钟），只能断言「指令进入对话」，无法断言「最终生成的 automation spec 正确」；② **alert 真实触发无法验证**——它要求 AMD 从 $457 实际跌破 $100，等待期不可控。这两处依赖人工走查，已在 [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) §6 明确标注。
 - **`$0.0` 这条红用例是「已知缺陷跟踪」，不是「新 bug 探测器」。** 它只验证 EV/市值非 0。一旦该缺陷被修，这条会变绿；但它不会主动发现「EV 算错成别的数」这类更隐蔽的错误（需要值级校验，超出当前 scope）。
 
 ---
@@ -116,8 +97,8 @@ make report       # 打开 HTML 报告
 ```
 
 - 当前仓库最新全量实跑证据见 [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) §5.2——2026-09-03 两次本机实跑：先 **106 passed / 2 failed / 1 flaky**（markets 过度断言，已于 `4863cb4` 校准），后 **107 passed / 1 failed / 1 flaky**（failed 为设计内 D-1 `$0.0` 守卫；flaky 为估值 TTM 口径文案最晚填充，已在 `84e6477` 定位根因并修复——快照前先等其就绪）。校准后预期约 **108 passed / 1 failed（D-1）/ 0 flaky**。
-- Part 1 登录链路历史证据（97 passed + 1 failed，即 `$0.0` 缺陷）仍保留在 [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) 附录 C；Part 1 的 SSO 用例已不在本仓库（`part1/` 被 gitignore），该日志仅作历史参考。
-- 提交物即本仓库；运行证据为 `docs/PART1-onboarding.md` 附录 C 的列表式测试报告（等价 CI 日志）。
+- 探索阶段的登录链路历史证据（97 passed + 1 failed，即 `$0.0` 缺陷）保留在 [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) 附录 C；需 SSO 的用例仅本机运行（`part1/` 被 gitignore），该日志仅作历史参考。
+- 全套件运行证据为 `docs/PART1-onboarding.md` 附录 C 的列表式测试报告（等价 CI 日志）。
 
 ---
 
@@ -192,5 +173,5 @@ tests/helpers/common.ts    → gotoPlaybook / dashboard / waitForDataReady / 共
 ## 文档索引
 
 - [`README.md`](./README.md) — 同本文件的说明（当前亦为中文）。
-- [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) — Part 1 登录链路探索式测试报告（F-1~F-9；登录态用例 onboarding/journey 共 8 条需 SSO，markets 个股页 UI 已并入 `tests/` 公开套件）+ 运行证据（附录 C：97 passed + 1 failed，含二次复验）。
+- [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) — 登录链路探索式测试报告（F-1~F-9；登录态用例 onboarding/journey 共 8 条需 SSO，markets 个股页 UI 已并入 `tests/` 公开套件）+ 运行证据（附录 C：97 passed + 1 failed，含二次复验）。
 - [`tests/`](./tests) — 数据正确性套件（7 个 `@data` spec + 4 个 `@ui` spec + 1 个 `@markets` spec + 1 个 `@smoke` spec + helpers 提取层）。
