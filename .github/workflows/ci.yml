@@ -19,6 +19,12 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # The config requires BASE_URL/PLAYBOOK_PATH (no in-code defaults by design,
+    # .env is gitignored). CI provides the public patrol target explicitly —
+    # same values as .env.example.
+    env:
+      BASE_URL: https://alva.ai
+      PLAYBOOK_PATH: /u/lake/playbooks/amd-deep-dive
     steps:
       - uses: actions/checkout@v4
 
