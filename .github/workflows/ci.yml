@@ -22,27 +22,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Type check
-        run: npm run typecheck
+        run: pnpm run typecheck
 
       - name: Run smoke + UI (push / PR / manual)
         if: github.event_name != 'schedule'
-        run: npx playwright test --workers=1 --grep '@smoke|@ui'
+        run: pnpm exec playwright test --workers=1 --grep '@smoke|@ui'
 
       - name: Run data-correctness patrol (daily)
         if: github.event_name == 'schedule'
-        run: npx playwright test --workers=1 --grep '@data'
+        run: pnpm exec playwright test --workers=1 --grep '@data'
 
       - name: Upload HTML report
         if: always()

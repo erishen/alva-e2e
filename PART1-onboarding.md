@@ -246,12 +246,12 @@ markets 页同时是 **Part 1 旅程终点**（alert 点 AMD 进入）与 **Part
 **运行**：
 - Part 1 本地登录套件（本机 `part1/`，未纳入本仓库；需先 `node part1/export-state.mjs` 手动 SSO 登录导出会话）：
 ```bash
-npx playwright test --config part1/playwright.config.ts          # onboarding+journey 共 8 条
-npx playwright test --config part1/playwright.config.ts --list  # 仅列出用例
+pnpm exec playwright test --config part1/playwright.config.ts          # onboarding+journey 共 8 条
+pnpm exec playwright test --config part1/playwright.config.ts --list  # 仅列出用例
 ```
 - markets 个股页 UI 衔接（已纳入 `tests/`，公开页、可进 CI）：
 ```bash
-npx playwright test --grep "@markets"        # 使用根配置（tests/）
+pnpm exec playwright test --grep "@markets"        # 使用根配置（tests/）
 ```
 
 > **探索探针（`part1/probes/`，25 个一次性脚本，本地运行、未纳入本仓库）**：不属回归套件、不进 CI，是**本报告中每条发现的证据轨迹**——写断言前先用它们确认产品真实行为，每条都可重跑复现。命名约定：`probe-*`（探索性，边跑边看）/ `verify-*`（验证性，确认已提出的假设）。其本地说明见 `part1/probes/README.md`（该目录不随本仓库分发，仅作证据轨迹索引）。
@@ -319,7 +319,7 @@ Part 2 套件抓到 Playbook Comp 表 EV/Market cap 全 `$0.0`。本次在 `/mar
 > 本附录记录**数据正确性套件（Part 2）**的全量运行结果（97 passed + 1 failed，即 `$0.0` 真实数据缺陷）。Part 1 自身登录态用例（onboarding+journey 共 8 条，需 SSO；markets 页 UI 测试已迁入 `tests/`，见 §5）的结果见 §5。等价 CI 日志。
 
 环境：Playwright 1.62.1 + Chromium，macOS，直连 `https://alva.ai`（无本地服务）。
-完整运行命令：`npx playwright test --workers=1 --retries=0 --reporter=list`
+完整运行命令：`pnpm exec playwright test --workers=1 --retries=0 --reporter=list`
 
 ---
 
@@ -416,10 +416,10 @@ Part 2 套件抓到 Playbook Comp 表 EV/Market cap 全 `$0.0`。本次在 `/mar
 ### 如何复现
 
 ```bash
-npm install
-npx playwright install chromium
-npx playwright test --workers=1 --reporter=list
+pnpm install
+pnpm exec playwright install chromium
+pnpm exec playwright test --workers=1 --reporter=list
 # 期望：97 passed + 1 failed（failed = 已知的 $0.0 数据缺陷）
-# 只看数据正确性绿集：npm run test:data  （含该红用例，仍会红）
-# 跳过已知缺陷看其余全绿：npx playwright test --grep-invert "EV 与 Market cap"
+# 只看数据正确性绿集：pnpm run test:data  （含该红用例，仍会红）
+# 跳过已知缺陷看其余全绿：pnpm exec playwright test --grep-invert "EV 与 Market cap"
 ```

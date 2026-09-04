@@ -49,7 +49,7 @@ https://alva.ai/u/lake/playbooks/amd-deep-dive
 
 - **只覆盖一个 Playbook、一个时间点。** 这是 AMD 单一标的的快照。其他 Playbook（不同行业 / 不同数据密度）可能暴露不同的渲染或取数问题；且页面每约 4 小时刷新，我无法保证每次刷新后结构不变。
 - **交叉校验是「内部一致性」，不是「对外部真相」。** 市值 ÷ P/S 反推营收、Comps 表 vs 财报表同口径——这些都只在页面**内部**互验。如果 Alva 后端**所有数据源同时错了**（如汇率、单位基准），套件会全绿却仍是错的。要真正防住，需要引入一个外部 ground-truth（如 SEC/行情 API）做三方比对，本套件未做。
-- **限流让运行本身不稳定。** 站点对高频访问有明显限流（连续跑十几趟后 API 间歇返回空数据）。`npm test` 偶尔会因加载不出数据而失败，需要 `--workers=1` 串行重试。这意味着 CI 必须容忍偶发失败、或加预热/退避，否则会出假红。
+- **限流让运行本身不稳定。** 站点对高频访问有明显限流（连续跑十几趟后 API 间歇返回空数据）。`pnpm test` 偶尔会因加载不出数据而失败，需要 `--workers=1` 串行重试。这意味着 CI 必须容忍偶发失败、或加预热/退避，否则会出假红。
 - **本套件（Part 2）不覆盖登录态——这是刻意的设计取舍，已由 Part 1 互补，但端到端仍是弱项。** 注册、Automation 创建、Alert 配置与推送因需真实账号而排除在本套件外（公开页面才能无人值守巡检）。Part 1 的登录态用例（onboarding/journey 共 8 条）补上了登录链路的**骨架级**覆盖（路由可达、空状态引导、深链定位、行情非零），但仍有两处我自动化不了：① **automation 是异步 LLM 工作流**（构建数分钟），我只能断言「指令进入对话」，无法断言「最终生成的 automation spec 正确」；② **alert 真实触发无法验证**——它要求 AMD 从 $457 实际跌破 $100，等待期不可控。这两处目前依赖人工走查，已在 `PART1-onboarding.md` §6 明确标注。
 - **`$0.0` 这条红用例是「已知缺陷跟踪」，不是「新 bug 探测器」。** 它只验证 EV/市值非 0。一旦该缺陷被修，这条会变绿；但它不会主动发现「EV 算错成别的数」这类更隐蔽的错误（需要值级校验，超出当前 scope）。
 
@@ -67,7 +67,7 @@ https://alva.ai/u/lake/playbooks/amd-deep-dive
 `Makefile` 提供的目标：
 
 ```bash
-make install     # 首次：npm install + 安装 Chromium
+make install     # 首次：pnpm install + 安装 Chromium
 make test        # 运行全部测试（直连 alva.ai，无需本地服务）
 make test-smoke  # 只跑 @smoke 冒烟用例
 make test-ui     # 以 Playwright UI 模式运行（可视化，不是只跑外壳用例）
@@ -82,24 +82,24 @@ make clean       # 清理 test-results / playwright-report
 `package.json` 脚本（更细粒度，推荐直接用 npm）：
 
 ```bash
-npm test                  # 全部
-npm run test:data         # 只跑数据正确性用例（--grep @data）
-npm run test:ui-only      # 只跑外壳/交互用例（--grep @ui）
-npm run test:smoke        # 只跑 @smoke 冒烟
-npm run test:ui           # Playwright UI 模式
-npm run test:headed       # 有头模式
-npm run test:debug        # 调试模式
-npm run report            # 打开 HTML 报告
-npm run typecheck         # TS 类型检查
+pnpm test                  # 全部
+pnpm run test:data         # 只跑数据正确性用例（--grep @data）
+pnpm run test:ui-only      # 只跑外壳/交互用例（--grep @ui）
+pnpm run test:smoke        # 只跑 @smoke 冒烟
+pnpm run test:ui           # Playwright UI 模式
+pnpm run test:headed       # 有头模式
+pnpm run test:debug        # 调试模式
+pnpm run report            # 打开 HTML 报告
+pnpm run typecheck         # TS 类型检查
 ```
 
 或用环境变量覆盖目标页面：
 
 ```bash
-BASE_URL=https://alva.ai PLAYBOOK_PATH=/u/xxx/playbooks/yyy npm test
+BASE_URL=https://alva.ai PLAYBOOK_PATH=/u/xxx/playbooks/yyy pnpm test
 ```
 
-> 提示：线上站点慢且有偶发限流，完整套件建议 `npm test -- --workers=1` 串行跑更稳。
+> 提示：线上站点慢且有偶发限流，完整套件建议 `ppnpm test -- --workers=1` 串行跑更稳。
 
 ### 运行证据
 

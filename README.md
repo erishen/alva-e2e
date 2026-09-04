@@ -49,7 +49,7 @@ Almost all of this project's code was generated in conversation by an AI coding 
 
 - **Only one Playbook, one point in time.** This is a snapshot of a single AMD ticker. Other Playbooks (different sectors / data densities) may expose different rendering or fetch problems; and the page refreshes roughly every 4 hours, so I can't guarantee the structure stays put after each refresh.
 - **Cross-checks are "internal consistency", not "against external truth".** Market cap ÷ P/S back-solving revenue, comps table vs financials table same口径 — all only self-verify **within** the page. If Alva's backend were wrong on **all** data sources at once (e.g. FX rate, unit base), the suite would go all green yet still be wrong. Truly guarding against that needs an external ground-truth (e.g. SEC / quote API) for three-way comparison; this suite doesn't do that.
-- **Rate limiting makes the run itself unstable.** The site clearly rate-limits high-frequency access (after a dozen consecutive runs the API intermittently returns empty data). `npm test` can occasionally fail just from not loading data, needing `--workers=1` serial retries. That means CI must tolerate flaky failures, or add warm-up / back-off, or it'll produce false reds.
+- **Rate limiting makes the run itself unstable.** The site clearly rate-limits high-frequency access (after a dozen consecutive runs the API intermittently returns empty data). `pnpm test` can occasionally fail just from not loading data, needing `--workers=1` serial retries. That means CI must tolerate flaky failures, or add warm-up / back-off, or it'll produce false reds.
 - **This suite (Part 2) deliberately does not cover the auth state — a design trade-off, complemented by Part 1, but end-to-end is still weak.** Sign-up, Automation creation, and Alert config/push are excluded from this suite because they need a real account (only public pages can be patrolled unattended). Part 1's logged-in cases (onboarding/journey: 8) add **skeleton-level** coverage of the login chain (route reachable, empty-state guidance, deep-link targeting, non-zero quote), but two things I couldn't automate: ① **the automation is an async LLM workflow** (builds over minutes) — I can only assert "the instruction entered the conversation", not "the final generated automation spec is correct"; ② **real alert triggering can't be verified** — it requires AMD to actually fall from $457 through $100, an uncontrolled wait. Both currently rely on manual walkthrough and are flagged explicitly in `PART1-onboarding.md` §6.
 - **The `$0.0` red case is a "known-defect tracker", not a "new-bug detector".** It only asserts EV/market-cap ≠ 0. Once the defect is fixed this case goes green; but it won't proactively catch more subtle errors like "EV computed to a wrong number" (that needs value-level checks, beyond current scope).
 
@@ -67,7 +67,7 @@ Almost all of this project's code was generated in conversation by an AI coding 
 Targets provided by the `Makefile`:
 
 ```bash
-make install     # first time: npm install + install Chromium
+make install     # first time: ppnpm install + install Chromium
 make test        # run all tests (hits alva.ai directly, no local server needed)
 make test-smoke  # run only @smoke smoke cases
 make test-ui     # run in Playwright UI mode (visual — NOT "shell cases only")
@@ -82,26 +82,26 @@ make clean       # clean test-results / playwright-report
 `package.json` scripts (finer-grained; recommended to use npm directly):
 
 ```bash
-npm test                  # all
-npm run test:data         # data-correctness cases only (--grep @data)
-npm run test:ui-only      # shell/interaction cases only (--grep @ui)
-npm run test:smoke        # @smoke smoke only
-npm run test:ui           # Playwright UI mode
-npm run test:headed       # headed mode
-npm run test:debug        # debug mode
-npm run report            # open HTML report
-npm run typecheck         # TS type check
+pnpm test                  # all
+pnpm run test:data         # data-correctness cases only (--grep @data)
+pnpm run test:ui-only      # shell/interaction cases only (--grep @ui)
+pnpm run test:smoke        # @smoke smoke only
+pnpm run test:ui           # Playwright UI mode
+pnpm run test:headed       # headed mode
+pnpm run test:debug        # debug mode
+pnpm run report            # open HTML report
+pnpm run typecheck         # TS type check
 ```
 
 Or override the target page with env vars:
 
 ```bash
-BASE_URL=https://alva.ai PLAYBOOK_PATH=/u/xxx/playbooks/yyy npm test
+BASE_URL=https://alva.ai PLAYBOOK_PATH=/u/xxx/playbooks/yyy pnpm test
 ```
 
 > Configuration is also read from a local `.env` file (see [`.env.example`](./.env.example) for the full list). `playwright.config.ts` loads it via `dotenv`, so you can `cp .env.example .env` instead of prefixing every command with env vars.
 
-> Tip: the live site is slow and has occasional rate limiting. For a full run, `npm test -- --workers=1` serial is more stable.
+> Tip: the live site is slow and has occasional rate limiting. For a full run, `ppnpm test -- --workers=1` serial is more stable.
 
 ### Run evidence
 

@@ -18,32 +18,32 @@ help:
 	@echo "  可用环境变量覆盖: BASE_URL / PLAYBOOK_PATH"
 
 install:
-	npm install
-	npx playwright install chromium
+	pnpm install
+	pnpm exec playwright install chromium
 
 test:
-	npm test
+	pnpm test
 
 test-smoke:
-	npm run test:smoke
+	pnpm run test:smoke
 
 test-ui:
-	npm run test:ui
+	pnpm run test:ui
 
 test-headed:
-	npm run test:headed
+	pnpm run test:headed
 
 debug:
-	npm run test:debug
+	pnpm run test:debug
 
 report:
-	npm run report
+	pnpm run report
 
 codegen:
-	npm run codegen
+	pnpm run codegen
 
 typecheck:
-	npm run typecheck
+	pnpm run typecheck
 
 clean:
 	rm -rf test-results

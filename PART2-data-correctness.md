@@ -38,7 +38,7 @@
 - **实际**：整列 `$0.0`，等价于「可比分析里最核心的两个估值锚点缺失」。
 - **复现**：打开 playbook → 滚动到 Comparables 表 → 观察 `EV` / `Market cap` 列。
 - **证据（守卫用例）**：`tests/comps.spec.ts` → `EV 与 Market cap 应有真实数值（当前全部为 $0.0，已知缺陷）`。该用例**故意保持活跃失败**：`expect(bad).toEqual([])` 在 `$0.0` 出现时不通过，缺陷修复后自动转绿。
-- **可视化证据（自动留存，交付级、一眼自解释）**：守卫除断言外额外生成两张截图并 `attach` 到 HTML 报告（`npm run report` 直接看），均由本机 `npm test` 产出（沙箱连不上 alva.ai，无法代跑）——生成后 `git add evidence/` 即随仓库交付，评审人无需重跑即见真实页面状态。实现要点（曾踩坑截出白屏，已规避）：用 `beforeAll` 真正加载好的 `page` 经 `dashboardFrame()` 取跨域 iframe，先点 **Comps Tab** 让可比表可见，再在 iframe 内截；不用 test fixture 空白 `page`、不用 `page.screenshot()`（跨域 OOPIF 留白）。
+- **可视化证据（自动留存，交付级、一眼自解释）**：守卫除断言外额外生成两张截图并 `attach` 到 HTML 报告（`pnpm run report` 直接看），均由本机 `pnpm test` 产出（沙箱连不上 alva.ai，无法代跑）——生成后 `git add evidence/` 即随仓库交付，评审人无需重跑即见真实页面状态。实现要点（曾踩坑截出白屏，已规避）：用 `beforeAll` 真正加载好的 `page` 经 `dashboardFrame()` 取跨域 iframe，先点 **Comps Tab** 让可比表可见，再在 iframe 内截；不用 test fixture 空白 `page`、不用 `page.screenshot()`（跨域 OOPIF 留白）。
   - `evidence/comps-ev-mc-zero.png`（**主证据**）：`.comps-grid` 元素截图，已注入 **红框 + 浅红底高亮** EV / Market cap 两列（第 1、2 个 `.cg-num`），`$0.0` 缺陷列一眼可见。
   - `evidence/comps-full.png`（**上下文证据**）：Comps 区块整段（抬高视口截 iframe `body`；因 Comps Tab 激活时其他区块 `display:none`，视口即整段可比表），含区块标题、红框高亮，及顶部 **红色文字标注横幅**「⚠ 缺陷证据：EV / Market cap 两列全部 = $0.0（AMD 为千亿级公司，客观为错误数据）」，证明是真实 AMD 页面且无需看报告即懂。
 - **录屏说明（不可靠，不依赖）**：`playwright.config.ts` 的 `video: 'retain-on-failure'` 会为失败用例留视频，但本组用例用 `describe.configure({ mode: 'serial' })` + `beforeAll` 共享一个页面，**视频录制的是 per-test 的 fixture 空白页而非共享仪表盘页**，对 D-1 这类用例同样会白屏。因此 D-1 的可靠视觉证据以**截图**为准，录屏不作为交付证据。
@@ -90,7 +90,7 @@
 | `freshness.spec.ts` | 数据新鲜度 | `@data` | 6 | 快照≤2 天、股价≤7 天、财报≤120 天、评级≤7 天、时间戳可解析、已报告期间<今天 |
 | `markets.spec.ts` | markets 个股页 | `@markets` | 5 | 深链高亮（默认 tab 仅 `aria-selected` 属性存在时校验，避免过度断言）、内容守卫用 waitForFunction 等待文本稳定到位（阈值 150，吸收慢加载/限流偶发短文本；作为「面板塌缩」探测器而非卡固定字数）、价格≠$0.0、Alva Agent 伴侣区、资源路由 200、F-8 错参回退 ×2 |
 
-> *用例数为 `test(...)` 声明数；`tabs.spec.ts`、`markets.spec.ts` 含参数化展开，实际执行更多。合计 **91 条声明**。参数化展开后的实际执行数见 §5.2 最新实跑（修复前本机全量 106 passed / 2 failed / 1 flaky）。`npm run test:data`（`--grep @data`）覆盖 7 个 `@data` spec；`npm run test:ui-only` 覆盖 4 个 `@ui` spec。
+> *用例数为 `test(...)` 声明数；`tabs.spec.ts`、`markets.spec.ts` 含参数化展开，实际执行更多。合计 **91 条声明**。参数化展开后的实际执行数见 §5.2 最新实跑（修复前本机全量 106 passed / 2 failed / 1 flaky）。`pnpm run test:data`（`--grep @data`）覆盖 7 个 `@data` spec；`pnpm run test:ui-only` 覆盖 4 个 `@ui` spec。
 
 ---
 
@@ -111,20 +111,20 @@
 ### 5.1 运行命令
 ```bash
 # 安装（首次）
-npm install && npx playwright install chromium
+pnpm install && pnpm exec playwright install chromium
 
 # 全量（直连 https://alva.ai，无需本地服务、无需登录）
-npm test
+pnpm test
 # 或
 make test
 
 # 按层运行
-npm run test:data     # 仅 @data 数据正确性（7 个 spec）
-npm run test:ui-only  # 仅 @ui 页面外壳与导航
-npm run test:smoke    # 仅 @smoke 冒烟
+pnpm run test:data     # 仅 @data 数据正确性（7 个 spec）
+pnpm run test:ui-only  # 仅 @ui 页面外壳与导航
+pnpm run test:smoke    # 仅 @smoke 冒烟
 
 # 查看 HTML 报告
-npm run report        # 或 make report
+pnpm run report        # 或 make report
 ```
 
 环境变量：`BASE_URL`（默认 `https://alva.ai`）、`PLAYBOOK_PATH`（默认 `/u/lake/playbooks/amd-deep-dive`）。
@@ -136,7 +136,7 @@ npm run report        # 或 make report
 
 ### 5.2.1 最新本机全量实跑（2026-09-03，commit 4863cb4 之前）
 
-- 命令：`npm test`（chromium 单端，本地 `.env` 默认 `BASE_URL=https://alva.ai` / `PLAYBOOK_PATH=/u/lake/playbooks/amd-deep-dive`）
+- 命令：`pnpm test`（chromium 单端，本地 `.env` 默认 `BASE_URL=https://alva.ai` / `PLAYBOOK_PATH=/u/lake/playbooks/amd-deep-dive`）
 - 结果：**106 passed / 2 failed / 1 flaky**（约 5.2 min）
 - 分解：
   - `comps.spec.ts` EV/MC `$0.0` 守卫 = **1 failed（设计内）**：即 D-1，缺陷修复前保持红色，代表数据回归正盯住该 bug。
@@ -170,11 +170,11 @@ npm run report        # 或 make report
 
 | 目标 | 命令 |
 |---|---|
-| 全量 | `npm test` |
-| 数据层 | `npm run test:data` |
-| UI 层 | `npm run test:ui-only` |
-| 冒烟 | `npm run test:smoke` |
-| 类型检查 | `npm run typecheck` |
-| HTML 报告 | `npm run report` |
-| 调试 | `npm run test:debug` |
-| 有头模式 | `npm run test:headed` |
+| 全量 | `pnpm test` |
+| 数据层 | `pnpm run test:data` |
+| UI 层 | `pnpm run test:ui-only` |
+| 冒烟 | `pnpm run test:smoke` |
+| 类型检查 | `pnpm run typecheck` |
+| HTML 报告 | `pnpm run report` |
+| 调试 | `pnpm run test:debug` |
+| 有头模式 | `pnpm run test:headed` |
