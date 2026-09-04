@@ -5,7 +5,7 @@
 本项目的核心目标不是 UI / 多端样式，而是**验证页面里的数据对不对**：
 数字有没有算错、跨表口径是否一致、有没有脏值 / 占位符残留、枚举值是否合法、更新是否新鲜。
 
-默认被测对象（AMD 深度报告）：
+被测目标（经 `.env` 配置，必填——见下方[运行](#运行)章节；代码内无默认值）：
 
 ```
 https://alva.ai/u/lake/playbooks/amd-deep-dive
@@ -79,7 +79,7 @@ make typecheck   # TypeScript 类型检查
 make clean       # 清理 test-results / playwright-report
 ```
 
-`package.json` 脚本（更细粒度，推荐直接用 npm）：
+`package.json` 脚本（更细粒度，推荐直接用 pnpm）：
 
 ```bash
 pnpm test                  # 全部

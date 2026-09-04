@@ -5,7 +5,7 @@ A **Playwright data-correctness test** suite for the public playbook pages on [a
 The core goal is **not** UI / multi-device styling — it is **verifying whether the data on the page is actually correct**:
 are the numbers computed right, are cross-table figures consistent, are there dirty values / leftover placeholders, are the enum values valid, is the data fresh.
 
-Default target (the AMD deep-dive report):
+Configured target (set via `.env`, required — see [Configuration](#running); no in-code default):
 
 ```
 https://alva.ai/u/lake/playbooks/amd-deep-dive
@@ -79,7 +79,7 @@ make typecheck   # TypeScript type check
 make clean       # clean test-results / playwright-report
 ```
 
-`package.json` scripts (finer-grained; recommended to use npm directly):
+`package.json` scripts (finer-grained; recommended to use pnpm directly):
 
 ```bash
 pnpm test                  # all
