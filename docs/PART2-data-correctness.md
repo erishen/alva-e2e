@@ -136,7 +136,7 @@ pnpm run report        # 或 make report
 
 ### 5.2.1 最新本机全量实跑（2026-09-03，commit 4863cb4 之前）
 
-- 命令：`pnpm test`（chromium 单端，本地 `.env` 默认 `BASE_URL=https://alva.ai` / `PLAYBOOK_PATH=/u/lake/playbooks/amd-deep-dive`）
+- 命令：`pnpm test`（chromium 单端，目标站点由本地 `.env` 提供：`BASE_URL=https://alva.ai` / `PLAYBOOK_PATH=/u/lake/playbooks/amd-deep-dive`；现为必填配置，代码内无默认值，缺失即启动失败）
 - 结果：**106 passed / 2 failed / 1 flaky**（约 5.2 min）
 - 分解：
   - `comps.spec.ts` EV/MC `$0.0` 守卫 = **1 failed（设计内）**：即 D-1，缺陷修复前保持红色，代表数据回归正盯住该 bug。

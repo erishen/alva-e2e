@@ -19,7 +19,7 @@ https://alva.ai/u/lake/playbooks/amd-deep-dive
 >
 > | Part | Artifact | Contents |
 > |---|---|---|
-> | **Part 2** (the body of this README) | `tests/` — 13 specs (7 `@data` + 4 `@ui` + 1 `@markets` + 1 `@smoke`, plus a `helpers/` extraction layer) | A **production financial-data patrol** suite for the published public Playbook (AMD Deep-Dive). Latest full run: **106 passed / 2 failed / 1 flaky** (1 failed = designed D-1 `$0.0` guard; the other a markets over-assertion, since calibrated — see docs/PART2 §5.2), matching the JD's core responsibility "production-quality patrol … financial data correctness" |
+> | **Part 2** (the body of this README) | `tests/` — 13 specs (7 `@data` + 4 `@ui` + 1 `@markets` + 1 `@smoke`, plus a `helpers/` extraction layer) | A **production financial-data patrol** suite for the published public Playbook (AMD Deep-Dive). Latest full run: **107 passed / 1 failed / 1 flaky** (1 failed = designed D-1 `$0.0` guard; the flaky = valuation TTM label, root-caused and fixed since — see docs/PART2 §5.2), matching the JD's core responsibility "production-quality patrol … financial data correctness" |
 > | **Part 1** | [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) | An **exploratory testing report** of the login journey "sign up → create Portfolio Watch Automation → create Playbook → receive Alert": 9 findings (F-1~F-9) + logged-in test cases, all green (onboarding/journey: 8, SSO-required; the markets stock-page UI suite is merged into the public `tests/` suite) |
 >
 > Run evidence: Part 2 full-run is in [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) §5.2; Part 1 historical evidence is in [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) Appendix C. The three sections below follow the take-home requirements (Part 2 first, since it is the automated deliverable).
@@ -67,7 +67,7 @@ Almost all of this project's code was generated in conversation by an AI coding 
 Targets provided by the `Makefile`:
 
 ```bash
-make install     # first time: ppnpm install + install Chromium
+make install     # first time: pnpm install + install Chromium
 make test        # run all tests (hits alva.ai directly, no local server needed)
 make test-smoke  # run only @smoke smoke cases
 make test-ui     # run in Playwright UI mode (visual — NOT "shell cases only")
@@ -93,15 +93,19 @@ pnpm run report            # open HTML report
 pnpm run typecheck         # TS type check
 ```
 
-Or override the target page with env vars:
+**The target site is configuration, not code**: `BASE_URL` and `PLAYBOOK_PATH` are required and have **no in-code default** — the suite fails fast at startup if they are unset. Set them in a local `.env` (copy [`.env.example`](./.env.example); loaded automatically via `dotenv`):
+
+```bash
+cp .env.example .env   # then edit as needed
+```
+
+Or prefix a single command with env vars:
 
 ```bash
 BASE_URL=https://alva.ai PLAYBOOK_PATH=/u/xxx/playbooks/yyy pnpm test
 ```
 
-> Configuration is also read from a local `.env` file (see [`.env.example`](./.env.example) for the full list). `playwright.config.ts` loads it via `dotenv`, so you can `cp .env.example .env` instead of prefixing every command with env vars.
-
-> Tip: the live site is slow and has occasional rate limiting. For a full run, `ppnpm test -- --workers=1` serial is more stable.
+> Tip: the live site is slow and has occasional rate limiting. For a full run, `pnpm test -- --workers=1` serial is more stable.
 
 ### Run evidence
 
@@ -111,7 +115,7 @@ make test         # full run (hits alva.ai directly, no local server)
 make report       # open the HTML report
 ```
 
-- Latest full-run evidence for the current repo: see [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) §5.2 — local full run 2026-09-03: **106 passed / 2 failed / 1 flaky** (1 failed = designed D-1 `$0.0` guard; the other a markets over-assertion, since calibrated at `4863cb4`; 1 flaky = chat welcome msg on slow live site, retried through). Calibrated re-run is expected ~107 passed / 1 failed.
+- Latest full-run evidence for the current repo: see [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) §5.2 — local full runs 2026-09-03: first **106 passed / 2 failed / 1 flaky** (markets over-assertion, calibrated at `4863cb4`), then **107 passed / 1 failed / 1 flaky** (1 failed = designed D-1 `$0.0` guard; the flaky = valuation TTM label populated last, root-caused and fixed at `84e6477` by gating the snapshot on it). Calibrated expectation: ~**108 passed / 1 failed (D-1) / 0 flaky**.
 - Historical Part 1 login-journey evidence (97 passed + 1 failed, the `$0.0` defect) remains in [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) Appendix C; Part 1's SSO cases are no longer in this repo (gitignored `part1/`), so that log is kept as historical reference only.
 - The deliverable is this repo; the run evidence is the list-style test report in `docs/PART1-onboarding.md` Appendix C (equivalent to CI logs).
 

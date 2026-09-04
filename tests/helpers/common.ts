@@ -1,9 +1,12 @@
 import { Page, expect, FrameLocator, Browser } from '@playwright/test';
 import { dashboardFrame, extractDashboard, DashboardData } from './extract';
+import { PLAYBOOK_PATH as CONFIG_PLAYBOOK_PATH } from '../../playwright.config';
 
-/** 被测 playbook 路径（可用环境变量 PLAYBOOK_PATH 覆盖） */
-export const PLAYBOOK_PATH =
-  process.env.PLAYBOOK_PATH ?? '/u/lake/playbooks/amd-deep-dive';
+/**
+ * 被测 playbook 路径：单一事实来源是 playwright.config.ts（从 .env 读取，
+ * 无代码内默认值）。这里 re-export 供各 spec 使用。
+ */
+export const PLAYBOOK_PATH = CONFIG_PLAYBOOK_PATH;
 
 export const PAGE_TITLE = 'AMD Deep-Dive';
 export const COMPANY_NAME = 'Advanced Micro Devices';

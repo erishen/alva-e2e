@@ -2,17 +2,26 @@ import 'dotenv/config';
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * 被测站点是 alva.ai 的公开 playbook 页面（线上环境，非本地服务）。
- * 因此这里不配置 webServer —— 没有需要拉起的 SUT，
- * 所有测试直连 https://alva.ai。
- *
- * 环境变量（从 .env 自动加载，见 .env.example；也可用命令行前缀覆盖）：
- *   BASE_URL    覆盖被测地址，默认 https://alva.ai
- *   PLAYBOOK_PATH 覆盖 playbook 路径，默认 /u/lake/playbooks/amd-deep-dive
+ * 被测站点完全由环境变量驱动（playwright.config.ts 顶部经 dotenv 自动加载 .env；
+ * 也可用命令行前缀覆盖）。代码内不内置任何站点默认值——目标站点属于配置而非代码：
+ *   BASE_URL      被测站点地址（必填）
+ *   PLAYBOOK_PATH 被测 playbook 路径（必填）
+ * 缺失时启动即失败并给出修复指引，防止套件静默指向错误站点。
  */
-export const BASE_URL = process.env.BASE_URL ?? 'https://alva.ai';
-export const PLAYBOOK_PATH =
-  process.env.PLAYBOOK_PATH ?? '/u/lake/playbooks/amd-deep-dive';
+const envBaseUrl = process.env.BASE_URL;
+const envPlaybookPath = process.env.PLAYBOOK_PATH;
+
+if (!envBaseUrl || !envPlaybookPath) {
+  throw new Error(
+    '[alva-e2e] Missing required env: BASE_URL / PLAYBOOK_PATH.\n' +
+      'Fix: cp .env.example .env  (then edit .env), or export the vars before running.\n' +
+      'No in-code default is provided on purpose — the target site is configuration.'
+  );
+}
+
+// 导出为确定的 string 类型（上方校验已收窄），供 tests/helpers 复用。
+export const BASE_URL: string = envBaseUrl;
+export const PLAYBOOK_PATH: string = envPlaybookPath;
 
 export default defineConfig({
   testDir: './tests',

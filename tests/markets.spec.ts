@@ -17,10 +17,12 @@
  *   4. 带 ID 资源路由 /markets/<ticker> 正常（对照无 ID 功能路由 /playbooks、/alerts 的 404）。
  *   5. 错参静默回退现状（F-8 已知缺陷回归守卫）：?tab=news / ?tab=smart-money 不崩溃、页面仍可用。
  *
- * 鉴权：无。页面为公开页，直连 BASE_URL（默认 https://alva.ai）。
+ * 鉴权：无。页面为公开页，直连 BASE_URL（由 .env 提供，无代码默认值）。
  */
 import { test, expect } from '@playwright/test';
 
+// WATCH_TICKER 是测试数据（被测 playbook 的标的），非站点配置；默认 AMD 与
+// .env.example 一致，可用环境变量覆盖。站点地址/路径一律来自 .env（必填）。
 const TICKER = process.env.WATCH_TICKER ?? 'AMD';
 
 // markets 页 6 个 tab 的**规范** ?tab= 值（探针反推：newsSocial / smartMoney 为驼峰，见 F-8）

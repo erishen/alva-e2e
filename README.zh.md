@@ -19,7 +19,7 @@ https://alva.ai/u/lake/playbooks/amd-deep-dive
 >
 > | 部分 | 交付物 | 内容 |
 > |---|---|---|
-> | **Part 2**（本 README 主体） | `tests/` 共 13 个 spec（7 个 `@data` + 4 个 `@ui` + 1 个 `@markets` + 1 个 `@smoke`，另有 `helpers/` 提取层） | 已发布公开 Playbook（AMD Deep-Dive）的**生产环境金融数据巡检**套件，最新全量实跑 **106 passed / 2 failed / 1 flaky**（1 个 failed 为设计内 D-1 `$0.0` 守卫；另一个为 markets 过度断言，已校准——见 docs/PART2 §5.2），对应 JD 核心职责「生产环境质量巡检……金融数据正确性」 |
+> | **Part 2**（本 README 主体） | `tests/` 共 13 个 spec（7 个 `@data` + 4 个 `@ui` + 1 个 `@markets` + 1 个 `@smoke`，另有 `helpers/` 提取层） | 已发布公开 Playbook（AMD Deep-Dive）的**生产环境金融数据巡检**套件，最新全量实跑 **107 passed / 1 failed / 1 flaky**（1 个 failed 为设计内 D-1 `$0.0` 守卫；flaky 为估值 TTM 口径文案，已定位根因并修复——见 docs/PART2 §5.2），对应 JD 核心职责「生产环境质量巡检……金融数据正确性」 |
 > | **Part 1** | [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) | 登录链路「注册 → 建 Portfolio Watch Automation → 建 Playbook → 收 Alert」的**探索式测试报告**，9 条发现（F-1~F-9）+ 登录态用例全绿（onboarding/journey 共 8 条需 SSO；markets 个股页 UI 已并入 `tests/` 公开套件） |
 >
 > 运行证据：Part 2 全量实跑见 [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) §5.2；Part 1 历史证据见 [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) 附录 C。下面三节按笔试要求说明（以 Part 2 为主，因其为自动化交付主体）。
@@ -93,13 +93,19 @@ pnpm run report            # 打开 HTML 报告
 pnpm run typecheck         # TS 类型检查
 ```
 
-或用环境变量覆盖目标页面：
+**被测站点是配置而非代码**：`BASE_URL` 与 `PLAYBOOK_PATH` 为**必填**，代码内**不内置默认值**——未配置时套件启动即失败并给出修复指引。在本地 `.env` 中设置（复制 [`.env.example`](./.env.example)；经 `dotenv` 自动加载）：
+
+```bash
+cp .env.example .env   # 然后按需修改
+```
+
+或单条命令前缀环境变量：
 
 ```bash
 BASE_URL=https://alva.ai PLAYBOOK_PATH=/u/xxx/playbooks/yyy pnpm test
 ```
 
-> 提示：线上站点慢且有偶发限流，完整套件建议 `ppnpm test -- --workers=1` 串行跑更稳。
+> 提示：线上站点慢且有偶发限流，完整套件建议 `pnpm test -- --workers=1` 串行跑更稳。
 
 ### 运行证据
 
@@ -109,7 +115,7 @@ make test         # 全量（直连 alva.ai，无需本地服务）
 make report       # 打开 HTML 报告
 ```
 
-- 当前仓库最新全量实跑证据见 [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) §5.2——2026-09-03 本机实跑 **106 passed / 2 failed / 1 flaky**（1 个 failed 为设计内 D-1 `$0.0` 守卫；另一个为 markets 过度断言，已于 `4863cb4` 校准；1 个 flaky 为站点慢加载致聊天欢迎语偶发，重试通过）。校准后复跑预期约 107 passed / 1 failed。
+- 当前仓库最新全量实跑证据见 [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) §5.2——2026-09-03 两次本机实跑：先 **106 passed / 2 failed / 1 flaky**（markets 过度断言，已于 `4863cb4` 校准），后 **107 passed / 1 failed / 1 flaky**（failed 为设计内 D-1 `$0.0` 守卫；flaky 为估值 TTM 口径文案最晚填充，已在 `84e6477` 定位根因并修复——快照前先等其就绪）。校准后预期约 **108 passed / 1 failed（D-1）/ 0 flaky**。
 - Part 1 登录链路历史证据（97 passed + 1 failed，即 `$0.0` 缺陷）仍保留在 [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) 附录 C；Part 1 的 SSO 用例已不在本仓库（`part1/` 被 gitignore），该日志仅作历史参考。
 - 提交物即本仓库；运行证据为 `docs/PART1-onboarding.md` 附录 C 的列表式测试报告（等价 CI 日志）。
 
