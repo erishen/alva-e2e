@@ -138,7 +138,7 @@ pnpm run report        # 或 make report
 环境变量：`BASE_URL`（默认 `https://alva.ai`）、`PLAYBOOK_PATH`（默认 `/u/lake/playbooks/amd-deep-dive`）。
 
 ### 5.2 证据说明（重要）
-- **本报告的缺陷登记表与覆盖矩阵基于用例设计定稿；实时通过/失败数字需在本机对线上站点实跑生成**（`playwright-report/index.html`）。沙箱环境无法直连 `alva.ai`（出口代理拦截 + 客户端渲染限流），故未在此嵌入一次新跑的计数。
+- **本报告的缺陷登记表与覆盖矩阵基于用例设计定稿；实时通过/失败数字以最近一次本机对线上站点的全量实跑为准（§5.2 与 `playwright-report/index.html`）。线上站点限流 + 客户端渲染，自动化运行环境的计数可能随刷新周期浮动，故报告以实录数字而非声称数字为准。
 - **D-1（$0.0 EV/MC）被设计为活跃失败守卫**：在缺陷修复前，该用例在报告中保持红色——这是预期状态，代表「数据回归正在盯住这个 bug」，不是套件不稳定。
 - 运行产物 `playwright-report/`、`test-results/` 已被 `.gitignore` 忽略，不随仓库提交。
 
