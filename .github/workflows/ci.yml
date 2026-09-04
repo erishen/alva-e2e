@@ -2,7 +2,7 @@ name: E2E (Playwright)
 
 # 让「可进 CI」的声明落地：本套件直连线上公开 playbook 页做只读数据正确性巡检。
 # - push / PR / 手动触发：跑 @smoke + @ui（快、稳，证明 CI 接线正确，全绿）
-# - 每日定时：跑 @data 生产环境数据巡逻（数据对时效敏感；已知 $0.0 缺陷会使其变红，属预期告警，见 PART2 §2 D-1）
+# - 每日定时：跑 @data 生产环境数据巡逻（数据对时效敏感；已知 $0.0 缺陷会使其变红，属预期告警，见 docs/PART2 §2 D-1）
 on:
   push:
     branches: [main, master]
