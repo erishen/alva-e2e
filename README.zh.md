@@ -1,37 +1,33 @@
 # alva-e2e（中文说明）
 
-对 [alva.ai](https://alva.ai) 公开 playbook 页面的 **Playwright 数据正确性测试**套件。
+对某线上 Web 仪表盘页面（被测站点经 `.env` 配置、代码内不硬编码——见下方[运行](#运行)章节）的 **Playwright 数据正确性测试**套件。
 
 本项目的核心目标不是 UI / 多端样式，而是**验证页面里的数据对不对**：
 数字有没有算错、跨表口径是否一致、有没有脏值 / 占位符残留、枚举值是否合法、更新是否新鲜。
 
-被测目标（经 `.env` 配置，必填——见下方[运行](#运行)章节；代码内无默认值）：
-
-```
-https://alva.ai/u/lake/playbooks/amd-deep-dive
-```
+被测站点与页面经 `.env` 配置（`BASE_URL` / `PLAYBOOK_PATH`，必填——见下方[运行](#运行)章节；代码内无默认值）。
 
 ---
 
 ## 仓库内容
 
-本套件巡检的是**金融数据正确性**——而非 UI 样式：数字有没有算错、跨表口径是否一致、有没有脏值 / 占位符残留、更新是否新鲜。公开 Playbook 页面可以无人值守地在 CI 里定时巡检；把同一个指标放在「财报表」「可比公司表」「行情 KPI」三处交叉校验，能抓出**单看任一边都发现不了**的取数 / 一致性故障。本套件确实抓到一个：可比公司表里所有公司的 EV 与 Market cap 都渲染成了 `$0.0`（见 docs/PART2 缺陷 D-1）。
+本套件巡检的是**金融数据正确性**——而非 UI 样式：数字有没有算错、跨表口径是否一致、有没有脏值 / 占位符残留、更新是否新鲜。这类线上页面可以无人值守地在 CI 里定时巡检；把同一个指标放在「财报表」「可比公司表」「行情 KPI」三处交叉校验，能抓出**单看任一边都发现不了**的取数 / 一致性故障。本套件确实抓到一个：可比公司表里所有公司的 EV 与 Market cap 都渲染成了 `$0.0`（见 docs/PART2 缺陷 D-1）。
 
 | 交付物 | 内容 |
 |---|---|
-| [`tests/`](./tests) — 共 13 个 spec（7 个 `@data` + 4 个 `@ui` + 1 个 `@markets` + 1 个 `@smoke`，另有 `helpers/` 提取层） | 已发布 AMD Deep-Dive Playbook 的**生产环境数据巡检**套件。最新全量实跑 **107 passed / 1 failed / 1 flaky**——failed 为设计内 D-1 `$0.0` 守卫；flaky（估值 TTM 口径文案）已定位根因并修复（见 [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) §5.2）。 |
+| [`tests/`](./tests) — 共 13 个 spec（7 个 `@data` + 4 个 `@ui` + 1 个 `@markets` + 1 个 `@smoke`，另有 `helpers/` 提取层） | 针对被测仪表盘页面的**生产环境数据巡检**套件。最新全量实跑 **107 passed / 1 failed / 1 flaky**——failed 为设计内 D-1 `$0.0` 守卫；flaky（估值 TTM 口径文案）已定位根因并修复（见 [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) §5.2）。 |
 | [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) | 数据正确性完整报告：缺陷登记表（D-1 确认缺陷 + D-2~D-6 防护守卫）、覆盖矩阵、含修复史的运行证据。 |
-| [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) | 登录链路（注册 → 建 Automation → 建 Playbook → 收 Alert）**探索式测试报告**：9 条发现（F-1~F-9）+ 登录态用例证据（附录 C）。 |
+| [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) | 登录链路（注册 → 建 Automation → 收 Alert）**探索式测试报告**：9 条发现（F-1~F-9）+ 登录态用例证据（附录 C）。 |
 | [`evidence/`](./evidence) | 随仓库提交的缺陷自动截图（红框高亮的 `$0.0` 列）。 |
 
 另有互补的登录态套件（onboarding/journey，需 SSO）仅本机运行、刻意不入库；其探索过程与发现见 [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md)。
 
 ## 已知局限
 
-- **只覆盖一个 Playbook、一个时间点。** 这是 AMD 单一标的的快照。其他 Playbook（不同行业 / 不同数据密度）可能暴露不同的渲染或取数问题；且页面每约 4 小时刷新，结构漂移无法完全排除。
+- **只覆盖一个被测页面、一个时间点。** 这是单一标的的快照。其他页面（不同行业 / 不同数据密度）可能暴露不同的渲染或取数问题；且页面每约 4 小时刷新，结构漂移无法完全排除。
 - **交叉校验是「内部一致性」，不是「对外部真相」。** 市值 ÷ P/S 反推营收、Comps 表 vs 财报表同口径——这些都只在页面**内部**互验。如果后端**所有数据源同时错了**（如汇率、单位基准），套件会全绿却仍是错的。要真正防住，需要引入外部 ground-truth（如 SEC / 行情 API）做三方比对，本套件未做。
 - **限流让运行本身不稳定。** 站点对高频访问有明显限流（连续跑十几趟后 API 间歇返回空数据）。`pnpm test` 偶尔会因加载不出数据而失败，需要 `--workers=1` 串行重试。这意味着 CI 必须容忍偶发失败、或加预热 / 退避，否则会出假红。
-- **登录态刻意不在巡检范围——这是保证无人值守的设计取舍。** 注册、Automation 创建、Alert 配置与推送因需真实账号而排除在外（公开页面才能无人值守巡检）。互补的登录态套件补上了登录链路的**骨架级**覆盖（路由可达、空状态引导、深链定位、行情非零），但仍有两处无法自动化：① **automation 是异步 LLM 工作流**（构建数分钟），只能断言「指令进入对话」，无法断言「最终生成的 automation spec 正确」；② **alert 真实触发无法验证**——它要求 AMD 从 $457 实际跌破 $100，等待期不可控。这两处依赖人工走查，已在 [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) §6 明确标注。
+- **登录态刻意不在巡检范围——这是保证无人值守的设计取舍。** 注册、Automation 创建、Alert 配置与推送因需真实账号而排除在外（公开页面才能无人值守巡检）。互补的登录态套件补上了登录链路的**骨架级**覆盖（路由可达、空状态引导、深链定位、行情非零），但仍有两处无法自动化：① **automation 是异步 LLM 工作流**（构建数分钟），只能断言「指令进入对话」，无法断言「最终生成的 automation spec 正确」；② **alert 真实触发无法验证**——它要求标的行情实际跌破所配置的告警阈值，等待期不可控。这两处依赖人工走查，已在 [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) §6 明确标注。
 - **`$0.0` 这条红用例是「已知缺陷跟踪」，不是「新 bug 探测器」。** 它只验证 EV/市值非 0。一旦该缺陷被修，这条会变绿；但它不会主动发现「EV 算错成别的数」这类更隐蔽的错误（需要值级校验，超出当前 scope）。
 
 ---
@@ -40,7 +36,7 @@ https://alva.ai/u/lake/playbooks/amd-deep-dive
 
 ### 前置条件
 
-- Node 22+，且能联网访问 `https://alva.ai`（中国大陆用户可能需要代理）。
+- Node 22+，且能联网访问被测站点（中国大陆用户可能需要代理）。
 - 本套件**直连线上站点**，无需启动任何本地服务。
 
 ### 命令
@@ -49,7 +45,7 @@ https://alva.ai/u/lake/playbooks/amd-deep-dive
 
 ```bash
 make install     # 首次：pnpm install + 安装 Chromium
-make test        # 运行全部测试（直连 alva.ai，无需本地服务）
+make test        # 运行全部测试（直连被测站点，无需本地服务）
 make test-smoke  # 只跑 @smoke 冒烟用例
 make test-ui     # 以 Playwright UI 模式运行（可视化，不是只跑外壳用例）
 make test-headed # 有头浏览器模式运行
@@ -83,7 +79,7 @@ cp .env.example .env   # 然后按需修改
 或单条命令前缀环境变量：
 
 ```bash
-BASE_URL=https://alva.ai PLAYBOOK_PATH=/u/xxx/playbooks/yyy pnpm test
+BASE_URL=https://example.com PLAYBOOK_PATH=/u/xxx/yyy pnpm test
 ```
 
 > 提示：线上站点慢且有偶发限流，完整套件建议 `pnpm test -- --workers=1` 串行跑更稳。
@@ -92,7 +88,7 @@ BASE_URL=https://alva.ai PLAYBOOK_PATH=/u/xxx/playbooks/yyy pnpm test
 
 ```bash
 make install      # 首次：装依赖 + Chromium
-make test         # 全量（直连 alva.ai，无需本地服务）
+make test         # 全量（直连被测站点，无需本地服务）
 make report       # 打开 HTML 报告
 ```
 
@@ -108,8 +104,8 @@ make report       # 打开 HTML 报告
 
 | 层 | 内容 | 定位方式 |
 |---|---|---|
-| 主文档（alva.ai） | 侧边栏、标题 "AMD Deep-Dive"、作者、README 徽章、右侧 Alva 聊天区 | 直接 `page.getByText(...)` |
-| `<iframe title="Dashboard">` | 真正的内容仪表盘（公司卡、7 个 Tab、KPI、财务表、Comps 表、风险表、评级、图表），src 指向 `lake.playbook.alva.ai`，路径带版本号（如 `v1.13.28`） | `dashboard(page)` helper（`page.frameLocator`） |
+| 宿主页（SPA 外壳） | 侧边栏、页面标题、作者区、右侧聊天组件 | 直接 `page.getByText(...)` |
+| `<iframe title="Dashboard">` | 真正的内容仪表盘（公司卡、7 个 Tab、KPI、财务表、Comps 表、风险表、评级、图表），src 为跨域且带版本号的 URL（如 `.../v1.13.28`） | `dashboard(page)` helper（`page.frameLocator`） |
 
 两个坑（数据测试尤其要命）：
 
@@ -118,7 +114,7 @@ make report       # 打开 HTML 报告
 
 另外两个站点现状（测试里有注释固化）：
 
-- 整站**没有任何 h1~h6 语义化标题**（标题是 `<span class="page-header-title">`）。公司名在 iframe 内、且文本是 `Advanced Micro Devices\n AMD · NASDAQ`（h1 内嵌 span）—— 用 `exact: true` 会永远不中，必须改用 `role=heading` 或文本包含匹配。
+- 整站**没有任何 h1~h6 语义化标题**（标题是 `<span class="page-header-title">`）。公司名在 iframe 内、且处于多行文本节点中（h1 内嵌 span）—— 用 `exact: true` 会永远不中，必须改用 `role=heading` 或文本包含匹配。
 - 未登录时控制台会有 401/403（账户接口）和被墙统计脚本的噪音，属预期；`meta.spec.ts` 只断言无**未捕获** JS 异常。
 
 ## 数据提取方式（关键设计）
@@ -150,11 +146,11 @@ tests/helpers/common.ts    → gotoPlaybook / dashboard / waitForDataReady / 共
 | `data-integrity.spec.ts` | `@data` | **全局脏值扫描**、数据结构齐全、营收占比图例总和 100%、空表格检查 |
 | `market-data.spec.ts` | `@data` | 行情 KPI + **可计算交叉校验**（52 周回撤 = f(股价, 高点)；市值 = 股价 × 流通股） |
 | `financials.spec.ts` | `@data` | 财报列序连续性、毛利率区间 [0,100]、EBITDA 与营业利润的业务约束 |
-| `comps.spec.ts` | `@data` | 可比公司表 + **跨表交叉校验**（Comps 表 AMD 行 == 财报表同口径）、**EV/市值非 $0** |
+| `comps.spec.ts` | `@data` | 可比公司表 + **跨表交叉校验**（Comps 表目标标的行 == 财报表同口径）、**EV/市值非 $0** |
 | `valuation.spec.ts` | `@data` | P/S 反推营收 vs 季度表 TTM 交叉校验、PEG 口径、评级枚举合法 |
 | `risk.spec.ts` | `@data` | 风险表枚举值合法性（Neutral/Positive/Negative）、信号日期格式 |
 | `freshness.spec.ts` | `@data` | 不同数据源的合理更新周期（财报季度 vs 实时行情 vs 评级） |
-| `markets.spec.ts` | `@markets` | markets 个股页深链高亮、价格≠$0.0、Alva Agent 伴侣区、资源路由 200、F-8 错参回退 ×2 |
+| `markets.spec.ts` | `@markets` | markets 个股页深链高亮、价格≠$0.0、伴侣 AI 聊天区、资源路由 200、F-8 错参回退 ×2 |
 
 ## 已发现的数据缺陷（用本套件可复现）
 

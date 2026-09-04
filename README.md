@@ -1,37 +1,33 @@
 # alva-e2e
 
-A **Playwright data-correctness test** suite for the public playbook pages on [alva.ai](https://alva.ai).
+A **Playwright data-correctness test** suite for a live web dashboard (the target site is configured via `.env`, never hardcoded — see [Configuration](#running)).
 
 The core goal is **not** UI / multi-device styling — it is **verifying whether the data on the page is actually correct**:
 are the numbers computed right, are cross-table figures consistent, are there dirty values / leftover placeholders, are the enum values valid, is the data fresh.
 
-Configured target (set via `.env`, required — see [Configuration](#running); no in-code default):
-
-```
-https://alva.ai/u/lake/playbooks/amd-deep-dive
-```
+The target site and page are configured via `.env` (`BASE_URL` / `PLAYBOOK_PATH`, required — see [Configuration](#running); no in-code defaults).
 
 ---
 
 ## What's inside
 
-The suite patrols **financial data correctness** — not UI styling: are computed numbers right, do cross-table figures agree, are there dirty values / leftover placeholders, is the data fresh. Public playbook pages can be patrolled unattended on CI, and cross-checking the same metric across the financials table, comps table, and quote KPI catches fetch/consistency failures that no single side reveals on its own. This suite caught one for real: every company's EV and Market cap in the comps table renders as `$0.0` (see defect D-1 in docs/PART2).
+The suite patrols **financial data correctness** — not UI styling: are computed numbers right, do cross-table figures agree, are there dirty values / leftover placeholders, is the data fresh. A live page like this can be patrolled unattended on CI, and cross-checking the same metric across the financials table, comps table, and quote KPI catches fetch/consistency failures that no single side reveals on its own. This suite caught one for real: every company's EV and Market cap in the comps table renders as `$0.0` (see defect D-1 in docs/PART2).
 
 | Artifact | Contents |
 |---|---|
-| [`tests/`](./tests) — 13 specs (7 `@data` + 4 `@ui` + 1 `@markets` + 1 `@smoke`, plus a `helpers/` extraction layer) | Production data-correctness patrol for the published AMD Deep-Dive playbook. Latest full run: **107 passed / 1 failed / 1 flaky** — the 1 failed is the by-design D-1 `$0.0` guard; the flaky (valuation TTM label) was root-caused and fixed since (see [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) §5.2). |
+| [`tests/`](./tests) — 13 specs (7 `@data` + 4 `@ui` + 1 `@markets` + 1 `@smoke`, plus a `helpers/` extraction layer) | Production data-correctness patrol for the target dashboard page. Latest full run: **107 passed / 1 failed / 1 flaky** — the 1 failed is the by-design D-1 `$0.0` guard; the flaky (valuation TTM label) was root-caused and fixed since (see [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) §5.2). |
 | [`docs/PART2-data-correctness.md`](./docs/PART2-data-correctness.md) | Full data-correctness report: defect register (D-1 confirmed `$0.0` + guards D-2~D-6), coverage matrix, run evidence with fix history. |
-| [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) | Exploratory report of the login journey (sign up → create automation → create playbook → receive alert): 9 findings (F-1~F-9) + logged-in test evidence (Appendix C). |
+| [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) | Exploratory report of the login journey (sign up → create automation → receive alert): 9 findings (F-1~F-9) + logged-in test evidence (Appendix C). |
 | [`evidence/`](./evidence) | Auto-captured defect screenshots (red-highlighted `$0.0` columns) committed with the repo. |
 
 A complementary logged-in suite (onboarding/journey, requires SSO) runs locally only and is intentionally not committed to this repo; its exploration and findings live in [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md).
 
 ## Known limitations
 
-- **Only one playbook, one point in time.** This is a snapshot of a single AMD ticker. Other playbooks (different sectors / data densities) may expose different rendering or fetch problems; and the page refreshes roughly every 4 hours, so structure drift cannot be ruled out.
+- **Only one target page, one point in time.** This is a snapshot of a single ticker. Other pages (different sectors / data densities) may expose different rendering or fetch problems; and the page refreshes roughly every 4 hours, so structure drift cannot be ruled out.
 - **Cross-checks are "internal consistency", not "against external truth".** Market cap ÷ P/S back-solving revenue, comps table vs financials table same caliber — all only self-verify **within** the page. If the backend were wrong on **all** data sources at once (e.g. FX rate, unit base), the suite would go all green yet still be wrong. Truly guarding against that needs an external ground-truth (e.g. SEC / quote API) for three-way comparison; this suite doesn't do that.
 - **Rate limiting makes the run itself unstable.** The site clearly rate-limits high-frequency access (after a dozen consecutive runs the API intermittently returns empty data). `pnpm test` can occasionally fail just from not loading data, needing `--workers=1` serial retries. That means CI must tolerate flaky failures, or add warm-up / back-off, or it'll produce false reds.
-- **The auth state is deliberately out of scope — a design trade-off that keeps the patrol unattended.** Sign-up, automation creation, and alert config/push are excluded because they need a real account (only public pages can be patrolled unattended). The complementary logged-in suite adds **skeleton-level** coverage of the login chain (route reachable, empty-state guidance, deep-link targeting, non-zero quote), but two things can't be automated: ① **the automation is an async LLM workflow** (builds over minutes) — one can only assert "the instruction entered the conversation", not "the final generated automation spec is correct"; ② **real alert triggering can't be verified** — it requires AMD to actually fall from $457 through $100, an uncontrolled wait. Both rely on manual walkthrough and are flagged explicitly in [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) §6.
+- **The auth state is deliberately out of scope — a design trade-off that keeps the patrol unattended.** Sign-up, automation creation, and alert config/push are excluded because they need a real account (only public pages can be patrolled unattended). The complementary logged-in suite adds **skeleton-level** coverage of the login chain (route reachable, empty-state guidance, deep-link targeting, non-zero quote), but two things can't be automated: ① **the automation is an async LLM workflow** (builds over minutes) — one can only assert "the instruction entered the conversation", not "the final generated automation spec is correct"; ② **real alert triggering can't be verified** — it requires the underlying quote to actually cross the configured alert threshold, an uncontrolled wait. Both rely on manual walkthrough and are flagged explicitly in [`docs/PART1-onboarding.md`](./docs/PART1-onboarding.md) §6.
 - **The `$0.0` red case is a "known-defect tracker", not a "new-bug detector".** It only asserts EV/market-cap ≠ 0. Once the defect is fixed this case goes green; but it won't proactively catch more subtle errors like "EV computed to a wrong number" (that needs value-level checks, beyond current scope).
 
 ---
@@ -40,7 +36,7 @@ A complementary logged-in suite (onboarding/journey, requires SSO) runs locally 
 
 ### Prerequisites
 
-- Node 22+, with network access to `https://alva.ai` (users in mainland China may need a proxy).
+- Node 22+, with network access to the target site (users in mainland China may need a proxy).
 - This suite **hits the live site directly**; no local server needs to be started.
 
 ### Commands
@@ -49,7 +45,7 @@ Targets provided by the `Makefile`:
 
 ```bash
 make install     # first time: pnpm install + install Chromium
-make test        # run all tests (hits alva.ai directly, no local server needed)
+make test        # run all tests (hits the target site directly, no local server needed)
 make test-smoke  # run only @smoke smoke cases
 make test-ui     # run in Playwright UI mode (visual — NOT "shell cases only")
 make test-headed # run in headed browser mode
@@ -83,7 +79,7 @@ cp .env.example .env   # then edit as needed
 Or prefix a single command with env vars:
 
 ```bash
-BASE_URL=https://alva.ai PLAYBOOK_PATH=/u/xxx/playbooks/yyy pnpm test
+BASE_URL=https://example.com PLAYBOOK_PATH=/u/xxx/yyy pnpm test
 ```
 
 > Tip: the live site is slow and has occasional rate limiting. For a full run, `pnpm test -- --workers=1` serial is more stable.
@@ -92,7 +88,7 @@ BASE_URL=https://alva.ai PLAYBOOK_PATH=/u/xxx/playbooks/yyy pnpm test
 
 ```bash
 make install      # first time: install deps + Chromium
-make test         # full run (hits alva.ai directly, no local server)
+make test         # full run (hits the target site directly, no local server)
 make report       # open the HTML report
 ```
 
@@ -108,8 +104,8 @@ The page is a **shell + iframe** two-layer structure — the starting point for 
 
 | Layer | Contents | Location method |
 |---|---|---|
-| Main document (alva.ai) | sidebar, title "AMD Deep-Dive", author, README badge, right-side Alva chat | directly `page.getByText(...)` |
-| `<iframe title="Dashboard">` | the real content dashboard (company card, 7 tabs, KPI, financials, comps, risk, ratings, charts); src points to `lake.playbook.alva.ai` with a version path (e.g. `v1.13.28`) | `dashboard(page)` helper (`page.frameLocator`) |
+| Host page (SPA shell) | sidebar, page title, author block, right-side chat widget | directly `page.getByText(...)` |
+| `<iframe title="Dashboard">` | the real content dashboard (company card, 7 tabs, KPI, financials, comps, risk, ratings, charts); src is a cross-origin, versioned URL (e.g. `.../v1.13.28`) | `dashboard(page)` helper (`page.frameLocator`) |
 
 Two traps (especially deadly for data tests):
 
@@ -118,7 +114,7 @@ Two traps (especially deadly for data tests):
 
 Two more site realities (hard-coded as comments in the tests):
 
-- The whole site has **no semantic h1~h6 headings** (the title is `<span class="page-header-title">`). The company name is inside the iframe and its text is `Advanced Micro Devices\n AMD · NASDAQ` (h1 embeds a span) — `exact: true` will never match; you must use `role=heading` or substring matching.
+- The whole site has **no semantic h1~h6 headings** (the title is `<span class="page-header-title">`). The company name is inside the iframe, inside a multi-line text node (h1 embeds a span) — `exact: true` will never match; you must use `role=heading` or substring matching.
 - When not logged in, the console shows expected 401/403 (account APIs) and noise from blocked analytics scripts; `meta.spec.ts` only asserts no **uncaught** JS exceptions.
 
 ## Data extraction approach (key design)
@@ -150,11 +146,11 @@ Why this design:
 | `data-integrity.spec.ts` | `@data` | **global dirty-value scan**, structure completeness, revenue-share legend sums to 100%, empty-table check |
 | `market-data.spec.ts` | `@data` | quote KPI + **computable cross-checks** (52w drawdown = f(price, high); market cap = price × shares out) |
 | `financials.spec.ts` | `@data` | financials column-order continuity, gross-margin range [0,100], EBITDA vs operating-profit business constraint |
-| `comps.spec.ts` | `@data` | comps table + **cross-table check** (comps AMD row == financials same口径), **EV/market-cap ≠ $0** |
+| `comps.spec.ts` | `@data` | comps table + **cross-table check** (a comps row == the financials table, same caliber), **EV/market-cap ≠ $0** |
 | `valuation.spec.ts` | `@data` | P/S back-solved revenue vs quarterly TTM cross-check, PEG口径, rating enum valid |
 | `risk.spec.ts` | `@data` | risk-table enum validity (Neutral/Positive/Negative), signal date format |
 | `freshness.spec.ts` | `@data` | reasonable refresh cadence per data source (quarterly financials vs real-time quote vs ratings) |
-| `markets.spec.ts` | `@markets` | markets stock-page deep-link highlight, price ≠ $0.0, Alva Agent companion area, resource route 200, F-8 bad-param fallback ×2 |
+| `markets.spec.ts` | `@markets` | markets stock-page deep-link highlight, price ≠ $0.0, companion AI-chat area, resource route 200, F-8 bad-param fallback ×2 |
 
 ## Known data defects (reproducible with this suite)
 
