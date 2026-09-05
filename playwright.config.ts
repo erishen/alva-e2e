@@ -35,8 +35,15 @@ export default defineConfig({
   timeout: 90 * 1000,
   expect: { timeout: 30 * 1000 },
 
-  reporter: process.env.CI
-    ? [['list'], ['html', { open: 'never' }]]
+  // 基础 reporter：list + html（永不自动打开）。设置 PATROL_REPORT 环境变量时
+  // 额外把 JSON 报告写入指定文件（供 scripts/check-patrol.mjs 判定已知缺陷哨兵，
+  // 见 .github/workflows/ci.yml 的每日 @data 巡逻步）。
+  reporter: process.env.PATROL_REPORT
+    ? [
+        ['list'],
+        ['html', { open: 'never' }],
+        ['json', { outputFile: process.env.PATROL_REPORT }],
+      ]
     : [['list'], ['html', { open: 'never' }]],
 
   use: {
