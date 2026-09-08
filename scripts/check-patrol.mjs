@@ -12,11 +12,29 @@ import { readFileSync } from 'node:fs';
 
 // 已登记的「预期失败」哨兵用例：文件名双向后缀匹配（JSON 报告里的 spec.file
 // 可能是 'comps.spec.ts' 也可能是 'tests/comps.spec.ts'）且完整标题包含该片段。
+//
+// 哨兵登记门槛：失败原因必须与上游 alva.ai 公开数据强相关，且 CI 与本地实跑都能
+// 复现。2026-09-07 起的两条新哨兵共用同一上游根因（AMD Deep-Dive playbook 的
+// 「Latest signal」字段整列渲染为「—」），分两条登记是为了「部分修复时还能
+// 触发新信号」—— 若合并为一条，将来上游只修一半就完全静音了。
 const KNOWN_FAILURES = [
   {
     file: 'tests/comps.spec.ts',
     titleIncludes: 'EV 与 Market cap 应有真实数值',
     reason: 'alva.ai 可比表 EV/Market cap 整列 $0.0（上游缺陷，修复后自动转绿）',
+  },
+  {
+    file: 'tests/data-integrity.spec.ts',
+    titleIncludes: '财报表的历史列不能有空值',
+    reason: 'alva.ai AMD playbook「Latest signal」列整列渲染为「—」'
+      + '（上游数据缺失，2026-09-07 起；CI run 34094914809 + 本机 2026-09-08 实跑均复现：'
+      + '56 passed / 3 failed，其它 56 项数据正常加载，可排除选择器/时序问题）',
+  },
+  {
+    file: 'tests/risk.spec.ts',
+    titleIncludes: '最近信号都带日期',
+    reason: 'alva.ai AMD playbook 风险表 7 条「Latest signal」全部为「—」'
+      + '（与 data-integrity 那条同源：上游数据缺失，2026-09-07 起）',
   },
 ];
 
