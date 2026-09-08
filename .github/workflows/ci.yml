@@ -2,6 +2,7 @@ name: E2E (Playwright)
 
 # 让「可进 CI」的声明落地：本套件直连线上公开 playbook 页做只读数据正确性巡检。
 # - push / PR / 手动触发：跑 @smoke + @ui（快、稳，证明 CI 接线正确，全绿）
+#   （手动触发时勾选 run_data_patrol 可改跑 @data 巡逻，用于随时复核生产数据）
 # - 每日定时：跑 @data 生产环境数据巡逻（数据对时效敏感）。已知 $0.0 缺陷哨兵
 #   用例允许失败（scripts/check-patrol.mjs 放行并留证据），任何其他用例失败
 #   仍然置红 —— 哨兵转绿即代表上游缺陷已修复。
@@ -12,6 +13,11 @@ on:
   schedule:
     - cron: '17 2 * * *'
   workflow_dispatch:
+    inputs:
+      run_data_patrol:
+        description: '跑每日 @data 生产数据巡逻（默认只跑 @smoke + @ui）'
+        type: boolean
+        default: false
 
 concurrency:
   group: e2e-${{ github.ref }}
@@ -50,11 +56,11 @@ jobs:
         run: pnpm run typecheck
 
       - name: Run smoke + UI (push / PR / manual)
-        if: github.event_name != 'schedule'
+        if: github.event_name != 'schedule' && !inputs.run_data_patrol
         run: pnpm exec playwright test --workers=1 --grep '@smoke|@ui'
 
       - name: Run data-correctness patrol (daily)
-        if: github.event_name == 'schedule'
+        if: github.event_name == 'schedule' || inputs.run_data_patrol
         run: |
           PATROL_REPORT=patrol-report.json pnpm exec playwright test --workers=1 --grep '@data' || true
           node scripts/check-patrol.mjs patrol-report.json
