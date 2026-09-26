@@ -17,10 +17,19 @@ test.describe('页面外壳 @ui', () => {
     await expect(author).toHaveText(/Mickie/);
   });
 
-  test('README 与 Automations 徽章', async ({ page }) => {
-    await expect(page.getByText('README', { exact: true })).toBeVisible();
-    // 自动化数量会变，只断言 "<n> Automations" 模式
-    await expect(page.getByText(/\d+\s*Automations/).first()).toBeVisible();
+  test('Playbook 头部 CTA 渲染（站点已移除旧 README/Automations 徽章）', async ({
+    page,
+  }) => {
+    // 站点于 2026-09-24 前后改版：原「README」「<n> Automations」徽章被移除，
+    // 头部改为「Subscribe / Remix」等 CTA。这两个 CTA 是响应式元素
+    // （窄屏 display:none），故断言「存在于 DOM」而非「可见」，既捕获被移除的真实回归，
+    // 又不受响应式显隐影响。
+    await expect(
+      page.getByText('Subscribe', { exact: true }).first()
+    ).toBeAttached();
+    await expect(
+      page.getByText('Remix', { exact: true }).first()
+    ).toBeAttached();
   });
 
   test('playbook 描述文案可见', async ({ page }) => {

@@ -57,7 +57,12 @@ test.describe('数据新鲜度 @data', () => {
     expect(asOf, `财报取数日期无法解析："${m![1]}"`).not.toBeNull();
 
     const lag = daysBetween(today, asOf!);
-    expect(lag, `财报取数日期来自未来：${m![1]}`).toBeGreaterThanOrEqual(0);
+    // 站点按「下一交易日 / T+1」口径标注 as-of，可能比运行日早 1~3 天
+    // （含周末、时区偏差）。允许 ≤3 天未来偏差，仍拦截 >3 天的明显数据管道错误。
+    expect(
+      lag,
+      `财报取数日期来自未来超过 3 天（疑似数据管道错误）：${m![1]}`
+    ).toBeGreaterThanOrEqual(-3);
     expect(lag, `财报数据已 ${lag} 天未更新（${m![1]}），超过 120 天`).toBeLessThanOrEqual(120);
   });
 
