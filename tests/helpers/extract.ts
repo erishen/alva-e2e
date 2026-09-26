@@ -15,17 +15,49 @@ import { Page, Frame } from '@playwright/test';
  * 所以提取必须用 querySelectorAll + textContent，不能用 innerText。
  */
 
-/** 拿到仪表盘 iframe 的 Frame 对象（跨域 iframe，Playwright 可直接 evaluate） */
-export async function dashboardFrame(page: Page): Promise<Frame> {
+/**
+ * 非阻塞解析「当前存活」的仪表盘内容帧；未就绪返回 null。
+ *
+ * 被测站点（alva.ai）的仪表盘 iframe 在冷启动期间会**多次导航/重定向**：
+ * SSR 先放一个 about:blank 占位 iframe，随后才提交到真正的
+ * api-llm.prd.alva.ai 内容帧，期间还可能出现一次 boot 重载。因此绝不能
+ * 「一次性抓一个 Frame 引用长期持有」——占位帧会在真正导航提交时 DETACH，
+ * 绑在它上面的 waitForFunction / evaluate 会立刻抛 "Frame was detached"。
+ *
+ * 这里只返回「此刻」的真实内容帧（按 name 或已知仪表盘域名匹配、URL 已提交、
+ * 非 about:blank、未 detached）；调用方若遇到 detach，应重新调用以拿最新帧。
+ */
+export function liveDashboardFrame(page: Page): Frame | null {
   const byName = page.frame({ name: 'playbook-content' });
-  if (byName) return byName;
-  const fallback = page.frames().find((fr) => fr.url() !== page.url());
-  if (!fallback) {
-    throw new Error(
-      `仪表盘 iframe 未找到。当前 frames: ${page.frames().map((f) => f.url()).join(' | ')}`
-    );
+  if (byName && !byName.isDetached() && byName.url() && byName.url() !== 'about:blank') {
+    return byName;
   }
-  return fallback;
+  const byUrl = page.frames().find(
+    (fr) =>
+      !fr.isDetached() &&
+      fr.url() &&
+      fr.url() !== 'about:blank' &&
+      fr.url() !== page.url() &&
+      /(lake\.playbook|api-llm(\.prd)?)\.alva\.ai/.test(fr.url())
+  );
+  return byUrl ?? null;
+}
+
+/**
+ * 阻塞等到仪表盘内容帧提交，返回存活的 Frame 对象（跨域 iframe，Playwright
+ * 可直接 evaluate）。见 liveDashboardFrame 的注释：必须等真实帧出现再返回，
+ * 否则拿到的会是 detach 掉的占位帧。最多等 30s，一般秒级即就绪。
+ */
+export async function dashboardFrame(page: Page): Promise<Frame> {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    const f = liveDashboardFrame(page);
+    if (f) return f;
+    await page.waitForTimeout(300);
+  }
+  throw new Error(
+    `仪表盘 iframe 内容帧未就绪（多次导航后仍拿不到）。frames: ${page.frames().map((f) => f.url()).join(' | ')}`
+  );
 }
 
 // ---------------------- 类型定义 ----------------------
@@ -117,9 +149,7 @@ export interface DashboardData {
  * 只做一次 DOM 遍历，后续所有断言都在 Node 侧对这份快照做 —— 快且可复现。
  */
 export async function extractDashboard(page: Page): Promise<DashboardData> {
-  const frame = await dashboardFrame(page);
-
-  return frame.evaluate(() => {
+  const collect = (): DashboardData => {
     const clean = (s: string | null | undefined): string =>
       (s || '').replace(/\s+/g, ' ').trim();
 
@@ -271,7 +301,25 @@ export async function extractDashboard(page: Page): Promise<DashboardData> {
       dataCells,
       allText: clean(document.body.textContent || ''),
     };
-  });
+  };
+
+  // iframe 在提取瞬间仍可能再发生一次导航/重载导致帧 detach —— 重新解析
+  // 存活帧并重试（最多 3 次），避免偶发 detach 误杀整组数据提取。
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const frame = await dashboardFrame(page);
+    try {
+      return await frame.evaluate(collect);
+    } catch (e) {
+      lastErr = e;
+      if (/Frame was detached/i.test((e as Error)?.message ?? '')) {
+        await page.waitForTimeout(400);
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr ?? new Error('extractDashboard 失败：仪表盘 iframe 反复 detach');
 }
 
 /** 从 KPI 列表里按 label 取值（大小写不敏感） */

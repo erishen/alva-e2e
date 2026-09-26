@@ -1,5 +1,5 @@
 import { Page, expect, FrameLocator, Browser } from '@playwright/test';
-import { dashboardFrame, extractDashboard, DashboardData } from './extract';
+import { dashboardFrame, liveDashboardFrame, extractDashboard, DashboardData } from './extract';
 import { PLAYBOOK_PATH as CONFIG_PLAYBOOK_PATH } from '../../playwright.config';
 
 /**
@@ -17,7 +17,7 @@ export const COMPANY_NAME = 'Advanced Micro Devices';
  */
 export const DATA_TIMEOUT = 90_000;
 
-export { dashboardFrame, extractDashboard };
+export { dashboardFrame, liveDashboardFrame, extractDashboard };
 export type { DashboardData };
 
 /** 导航到 playbook 页面并等待外壳就绪（标题可见） */
@@ -55,39 +55,64 @@ export async function waitForDataReady(
   page: Page,
   timeout = DATA_TIMEOUT
 ): Promise<void> {
-  const frame = await dashboardFrame(page);
-  await frame.waitForFunction(
-    () => {
-      const vals = [...document.querySelectorAll('.kpi-value')].map((e) =>
-        (e.textContent || '').trim()
+  // 仪表盘 iframe 冷启动期间会多次导航/重载，每次都会让旧 Frame 引用 detach。
+  // 这里用单个 timeout 预算统一覆盖「等帧提交 + 等数据就绪」，循环里每次都
+  // 重新解析存活帧；若等待中途帧 detach，则重新解析最新帧后重试，
+  // 避免 "Frame was detached" 把整组 @data 断言一锅端。
+  const start = Date.now();
+  let lastErr: unknown;
+  while (Date.now() - start < timeout) {
+    const frame = liveDashboardFrame(page);
+    if (!frame) {
+      await page.waitForTimeout(400);
+      continue;
+    }
+    try {
+      await frame.waitForFunction(
+        () => {
+          const vals = [...document.querySelectorAll('.kpi-value')].map((e) =>
+            (e.textContent || '').trim()
+          );
+          const hasPrice = vals.some((v) => /^\$\d/.test(v));
+          const comps = document.querySelectorAll('.comps-grid .cg-tk').length;
+          const finRows = document.querySelectorAll('.table-row.table-body-row').length;
+
+          // 估值倍数的 `sub` 口径（"TTM P/E" 等）是页面最晚填充的字段之一：
+          // 早期快照里 kpi-value 已是价格、但 kpi-sub 还是空占位。若不等它，
+          // valuation.spec 的「带 TTM 口径说明」断言会偶发误红（value 就绪、sub 未就绪）。
+          // 因此把「估值 KPI 的 value 已是数字且 sub 含 TTM」也作为就绪信号。
+          const valuationReady = ['P/E', 'P/S', 'EV / EBITDA'].every((label) => {
+            const cell = [...document.querySelectorAll('.kpi-cell')].find(
+              (c) =>
+                (c.querySelector('.kpi-label')?.textContent || '')
+                  .trim()
+                  .toLowerCase() === label.toLowerCase()
+            );
+            if (!cell) return false;
+            const v = (cell.querySelector('.kpi-value')?.textContent || '').trim();
+            const sub = (cell.querySelector('.kpi-sub')?.textContent || '')
+              .toUpperCase();
+            return /^[$\d]/.test(v) && sub.includes('TTM');
+          });
+
+          return hasPrice && comps >= 5 && finRows >= 15 && valuationReady;
+        },
+        undefined,
+        { timeout: Math.max(2000, timeout - (Date.now() - start)) }
       );
-      const hasPrice = vals.some((v) => /^\$\d/.test(v));
-      const comps = document.querySelectorAll('.comps-grid .cg-tk').length;
-      const finRows = document.querySelectorAll('.table-row.table-body-row').length;
-
-      // 估值倍数的 `sub` 口径（"TTM P/E" 等）是页面最晚填充的字段之一：
-      // 早期快照里 kpi-value 已是价格、但 kpi-sub 还是空占位。若不等它，
-      // valuation.spec 的「带 TTM 口径说明」断言会偶发误红（value 就绪、sub 未就绪）。
-      // 因此把「估值 KPI 的 value 已是数字且 sub 含 TTM」也作为就绪信号。
-      const valuationReady = ['P/E', 'P/S', 'EV / EBITDA'].every((label) => {
-        const cell = [...document.querySelectorAll('.kpi-cell')].find(
-          (c) =>
-            (c.querySelector('.kpi-label')?.textContent || '')
-              .trim()
-              .toLowerCase() === label.toLowerCase()
-        );
-        if (!cell) return false;
-        const v = (cell.querySelector('.kpi-value')?.textContent || '').trim();
-        const sub = (cell.querySelector('.kpi-sub')?.textContent || '')
-          .toUpperCase();
-        return /^[$\d]/.test(v) && sub.includes('TTM');
-      });
-
-      return hasPrice && comps >= 5 && finRows >= 15 && valuationReady;
-    },
-    undefined,
-    { timeout }
-  );
+      return;
+    } catch (e) {
+      lastErr = e;
+      const msg = (e as Error)?.message ?? '';
+      if (/Frame was detached/i.test(msg)) {
+        // 等待期间 iframe 又发生一次导航/重载 → 重新解析最新帧后重试
+        await page.waitForTimeout(400);
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr ?? new Error('waitForDataReady 超时：仪表盘数据未在限定时间内就绪');
 }
 
 /**
